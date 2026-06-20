@@ -1,0 +1,39 @@
+# Bilibili Transcript App 默认配置模板
+# 应用配置存储在 ~/.bilibili-transcript/config.toml
+
+[whisper]
+# 模式: "openai" (OpenAI 格式) | "local" (本地 REST API)
+mode = "openai"
+
+# API 地址
+# OpenAI: https://api.openai.com/v1/audio/transcriptions
+# 本地: http://127.0.0.1:17493/inference
+api_url = "https://api.openai.com/v1/audio/transcriptions"
+
+# API Key（可选，本地模式可留空）
+api_key = ""
+
+# 模型名称
+# OpenAI: whisper-1
+# 本地: tiny / base / small / medium
+model = "whisper-1"
+
+[bilibili]
+# B站 Cookie（从浏览器导出）
+cookie = ""
+
+# 输出目录
+output_dir = "~/bilibili-voice-only"
+
+[ai_summary]
+# 是否启用 AI 摘要
+enabled = false
+
+# API 地址（支持 OpenAI 兼容 API）
+api_url = "https://api.openai.com/v1/chat/completions"
+
+# API Key
+api_key = ""
+
+# 模型名称
+model = "gpt-4o-mini"

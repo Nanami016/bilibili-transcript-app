@@ -1,0 +1,31 @@
+# Rust
+target/
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+
+# Tauri
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (不要上传用户配置)
+config.toml
+*.db
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
