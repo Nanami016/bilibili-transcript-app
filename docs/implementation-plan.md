@@ -138,9 +138,10 @@ model = "whisper-1"
 
 [bilibili]
 cookie = ""                  # B站 Cookie 字符串
-video_dir = "~/Downloads/bilibili-download/video"      # 视频下载目录
-audio_dir = "~/Downloads/bilibili-download/audio"      # 音频下载目录
-transcript_dir = "~/Downloads/bilibili-download/transcript"  # 转录结果目录
+video_dir = "~/Downloads/bilibili-transcript-app/bilibili-video"      # 视频下载目录
+audio_dir = "~/Downloads/bilibili-transcript-app/bilibili-audio"      # 音频下载目录
+transcript_dir = "~/Downloads/bilibili-transcript-app/bilibili-transfer"  # 转录结果目录
+ai_analysis_dir = "~/Downloads/bilibili-transcript-app/bilibili-ai-analysis"  # AI 分析结果目录
 
 [ai_summary]
 enabled = true
@@ -476,15 +477,17 @@ brew install yt-dlp ffmpeg
 ### 6.2 输出目录
 
 ```
-~/Downloads/bilibili-download/
-├── video/                      # 视频下载目录
+~/Downloads/bilibili-transcript-app/
+├── bilibili-video/             # 视频下载目录
 │   └── 视频标题.mp4
-├── audio/                      # 音频下载目录
+├── bilibili-audio/             # 音频下载目录
 │   └── 视频标题.mp3
-└── transcript/                 # 转录结果目录
-    └── 2024/
-        └── 01/
-            └── 视频标题_UP主名_2024-01-15_BVxxx.txt
+├── bilibili-transfer/          # 转录结果目录
+│   └── 2024/
+│       └── 01/
+│           └── 视频标题_UP主名_2024-01-15_BVxxx.txt
+└── bilibili-ai-analysis/       # AI 分析结果目录
+    └── ...
 ```
 
 ---
@@ -542,21 +545,37 @@ brew install yt-dlp ffmpeg
 - [ ] 打包为 macOS .dmg
 - [ ] 编写 GitHub Release 说明
 
-### Phase 8: 任务中心 — 左侧导航 + 历史记录 + 进度追踪
+### Phase 8: 任务中心 — 左侧导航 + 历史记录 + 进度追踪 ✅
 
-- [ ] **左侧导航栏新增 4 个页面入口**：视频下载、音频下载、AI 分析、音频转录
-- [ ] **每个页面包含历史记录列表**：展示已完成的任务（标题、时间、状态、文件大小）
-- [ ] **每个页面包含实时进度区域**：显示当前正在进行的任务进度条（百分比、速度、预计剩余时间）
-- [ ] **后端任务队列系统**：支持并发任务管理、状态更新事件推送（Tauri event）
-- [ ] **数据库新增 tasks 表**：记录所有任务的历史（类型、URL、标题、状态、进度、开始/结束时间、输出路径）
+- [x] **左侧导航栏新增 4 个页面入口**：视频下载、音频下载、AI 分析、音频转录
+- [x] **每个页面包含历史记录列表**：展示已完成的任务（标题、时间、状态、文件大小）
+- [x] **每个页面包含实时进度区域**：显示当前正在进行的任务进度条（百分比、速度、预计剩余时间）
+- [x] **后端任务队列系统**：支持并发任务管理、状态更新事件推送（Tauri event）
+- [x] **数据库新增 tasks 表**：记录所有任务的历史（类型、URL、标题、状态、进度、开始/结束时间、输出路径）
+- [x] **全局进度提示框**：右上角 TaskToast 组件，实时显示任务进度，完成后自动消失
+- [x] **视频清晰度选择**：下拉框显示 360P/480P/720P/1080P，普通用户受限于 480P
+- [x] **打开文件夹按钮**：每个任务页面可直接打开对应输出目录
+- [x] **默认路径修改**：统一为 `~/Downloads/bilibili-transcript-app/` 子目录
+- [x] **AI 分析路径配置**：设置页面新增 `ai_analysis_dir` 配置项
+
+### Phase 8 实现差异（与原计划不同之处）
+
+| 原计划 | 实际实现 | 原因 |
+|--------|----------|------|
+| 首页操作直接调用下载/转录 | 首页操作改为启动异步任务 | 需要走 TaskManager 才能记录历史和推送进度 |
+| 视频下载无清晰度选择 | 新增下拉框选择 360P/480P/720P/1080P | 用户需要选择画质 |
+| 格式列表通过 yt-dlp 获取 | yt-dlp + Cookie 传递，普通用户最高 480P | B站限制：720P+ 需大会员 |
+| 输出路径 `~/Downloads/bilibili-download/` | `~/Downloads/bilibili-transcript-app/` 子目录 | 用户要求统一父目录 |
+| 无 AI 分析独立路径 | 新增 `ai_analysis_dir` 配置 | AI 分析结果需要独立存储 |
 
 ### 额外实现的功能（不在原计划中）
 
 - [x] **运行日志系统** — DEBUG 级别日志捕获，侧边栏独立页面查看
 - [x] **从浏览器读取 Cookie** — 支持 Chrome/Safari/Firefox/Edge
 - [x] **视频封面代理** — 通过 Rust 后端代理获取封面图片（解决 WebView 外部图片限制）
-- [x] **三路径配置** — 视频/音频/转录结果独立输出目录
+- [x] **四路径配置** — 视频/音频/转录/AI分析独立输出目录
 - [x] **Toast 通知** — 自动消失 + 手动关闭
+- [x] **全局 TaskToast** — 右上角进度提示框，支持多任务同时显示
 
 ---
 
