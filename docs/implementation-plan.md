@@ -96,36 +96,26 @@ bilibili-transcript-app/
 │   │
 │   ├── components/                     # UI 组件
 │   │   ├── Layout.tsx                  # 布局框架
-│   │   ├── Sidebar.tsx                 # 左侧栏
+│   │   ├── Sidebar.tsx                 # 左侧栏（含运行日志导航）
 │   │   ├── InputBar.tsx                # 顶部输入框
-│   │   ├── VideoCard.tsx               # 视频卡片
-│   │   ├── VideoDetail.tsx             # 视频详情面板
-│   │   ├── FavoriteList.tsx            # 收藏夹列表
-│   │   ├── TranscriptViewer.tsx        # 转录结果查看器
+│   │   ├── VideoCard.tsx               # 视频卡片（含封面）
+│   │   ├── LogViewer.tsx               # 日志查看器（设置页内嵌）
 │   │   └── common/                     # 通用组件
 │   │       ├── Button.tsx
-│   │       ├── Modal.tsx
-│   │       ├── Select.tsx
 │   │       ├── Spinner.tsx
 │   │       └── Toast.tsx
 │   │
 │   ├── pages/                          # 页面
-│   │   ├── Home.tsx                    # 首页
+│   │   ├── Home.tsx                    # 首页（视频解析+操作）
 │   │   ├── Favorite.tsx                # 收藏夹页
+│   │   ├── Logs.tsx                    # 运行日志页
 │   │   └── Settings.tsx                # 设置页
 │   │
-│   ├── hooks/                          # 自定义 Hooks
-│   │   ├── useVideo.ts
-│   │   ├── useFavorite.ts
-│   │   └── useConfig.ts
-│   │
 │   ├── lib/                            # 工具函数
-│   │   ├── tauri.ts                    # Tauri API 封装
-│   │   └── format.ts                   # 格式化工具
+│   │   └── tauri.ts                    # Tauri API 封装
 │   │
 │   └── styles/                         # 样式
-│       ├── global.css
-│       └── components/
+│       └── global.css
 │
 └── resources/                          # 静态资源
     └── default.toml                    # 默认配置模板
@@ -148,7 +138,9 @@ model = "whisper-1"
 
 [bilibili]
 cookie = ""                  # B站 Cookie 字符串
-output_dir = "~/bilibili-voice-only"
+video_dir = "~/Downloads/bilibili-download/video"      # 视频下载目录
+audio_dir = "~/Downloads/bilibili-download/audio"      # 音频下载目录
+transcript_dir = "~/Downloads/bilibili-download/transcript"  # 转录结果目录
 
 [ai_summary]
 enabled = true
@@ -415,9 +407,10 @@ brew install yt-dlp ffmpeg
 
 | 页面 | 功能 |
 |------|------|
-| **首页** | 输入视频链接、解析视频信息、执行操作 |
-| **收藏夹** | 显示收藏夹列表、批量转录 |
-| **设置** | Whisper 配置、B站 Cookie、AI 摘要配置 |
+| **首页** | 输入视频链接、解析视频信息（含封面）、执行操作 |
+| **收藏夹** | 显示收藏夹列表、收藏夹视频列表 |
+| **运行日志** | 查看 DEBUG 级别运行日志，支持筛选/清空/自动滚动 |
+| **设置** | B站 Cookie（浏览器读取/手动导入）、Whisper 配置、AI 摘要、三路径配置 |
 
 ### 5.3 视频卡片功能
 
@@ -448,76 +441,80 @@ brew install yt-dlp ffmpeg
 
 ### 6.2 输出目录
 
-**路径**: `~/bilibili-voice-only/`
-
 ```
-~/bilibili-voice-only/
-├── 2024/
-│   ├── 01/
-│   │   ├── 视频标题_UP主名_2024-01-15_BVxxx.txt
-│   │   └── ...
-│   └── 06/
-│       └── ...
-└── 2025/
-    └── ...
+~/Downloads/bilibili-download/
+├── video/                      # 视频下载目录
+│   └── 视频标题.mp4
+├── audio/                      # 音频下载目录
+│   └── 视频标题.mp3
+└── transcript/                 # 转录结果目录
+    └── 2024/
+        └── 01/
+            └── 视频标题_UP主名_2024-01-15_BVxxx.txt
 ```
 
 ---
 
 ## 七、实施步骤
 
-### Phase 1: 项目骨架搭建（2 天）
+### Phase 1: 项目骨架搭建 ✅
 
 - [x] 创建项目目录结构
 - [x] 配置 Tauri + React + TypeScript
 - [x] 实现基础 UI 框架（Layout、Sidebar、页面路由）
-- [ ] 确保项目能正常启动和运行
+- [x] 确保项目能正常启动和运行
 
-### Phase 2: 配置管理 + B站 API 集成（3 天）
+### Phase 2: 配置管理 + B站 API 集成 ✅
 
-- [ ] 实现配置文件读写（config.toml）
-- [ ] 实现 B站 API 调用（视频信息、字幕列表）
-- [ ] 实现 Cookie 管理（导入、存储、验证）
-- [ ] 实现收藏夹 API 调用
+- [x] 实现配置文件读写（config.toml）
+- [x] 实现 B站 API 调用（视频信息、字幕列表）
+- [x] 实现 Cookie 管理（从浏览器读取、手动导入、存储）
+- [x] 实现收藏夹 API 调用
+- [x] 配置文件格式自动迁移（旧格式 → 新格式）
 
-### Phase 3: 视频解析 + 格式列表 + 下载功能（3 天）
+### Phase 3: 视频解析 + 格式列表 + 下载功能 ✅
 
-- [ ] 实现视频信息解析
-- [ ] 实现格式列表获取（yt-dlp -F）
-- [ ] 实现视频下载（yt-dlp -f）
-- [ ] 实现音频提取（yt-dlp -x + ffmpeg）
+- [x] 实现视频信息解析（BVid 提取、API 调用）
+- [x] 实现格式列表获取（yt-dlp -F）
+- [x] 实现视频下载（yt-dlp + Cookie 文件传递）
+- [x] 实现音频提取（yt-dlp -x + ffmpeg 转 WAV）
 
-### Phase 4: 字幕获取 + Whisper 集成（4 天）
+### Phase 4: 字幕获取 + Whisper 集成 ✅
 
-- [ ] 实现字幕获取（CC → AI 降级）
-- [ ] 实现 Whisper API 客户端（OpenAI 格式）
-- [ ] 实现 Whisper API 客户端（本地 REST API）
-- [ ] 实现转录流水线（三级降级）
-- [ ] 实现连接测试功能
+- [x] 实现字幕获取（CC → AI 降级）
+- [x] 实现 Whisper API 客户端（OpenAI 格式 + 本地 REST API）
+- [x] 实现转录流水线（三级降级：CC → AI → Whisper）
+- [x] 实现 Whisper 连接测试功能
 
-### Phase 5: AI 摘要 + 数据库 + TXT 渲染（2 天）
+### Phase 5: AI 摘要 + 数据库 + TXT 渲染 ✅
 
-- [ ] 实现 AI 摘要生成（OpenAI 兼容 API）
-- [ ] 实现 SQLite 数据库（创建表、CRUD 操作）
-- [ ] 实现 TXT 文件渲染输出
-- [ ] 实现按年月组织目录
+- [x] 实现 AI 摘要生成（OpenAI 兼容 API）
+- [x] 实现 SQLite 数据库（创建表、CRUD 操作）
+- [x] 实现 TXT 文件渲染输出
+- [x] 实现按年月组织目录
 
-### Phase 6: 收藏夹功能 + 设置页面（3 天）
+### Phase 6: 收藏夹功能 + 设置页面 ✅
 
-- [ ] 实现收藏夹列表显示
-- [ ] 实现收藏夹视频列表
+- [x] 实现收藏夹列表显示
+- [x] 实现收藏夹视频列表
+- [x] 完善设置页面（Whisper、Cookie、AI 摘要、三路径配置）
 - [ ] 实现批量转录功能
-- [ ] 完善设置页面（Whisper、Cookie、AI 摘要配置）
 
-### Phase 7: UI 美化 + 错误处理 + 打包分发（3 天）
+### Phase 7: UI 美化 + 错误处理 + 打包分发
 
 - [ ] UI 美化和交互优化
-- [ ] 完善错误处理和用户提示
+- [x] 完善错误处理和用户提示（Toast 通知、运行日志）
 - [ ] 测试所有功能
 - [ ] 打包为 macOS .dmg
 - [ ] 编写 GitHub Release 说明
 
-**总计约 3 周**
+### 额外实现的功能（不在原计划中）
+
+- [x] **运行日志系统** — DEBUG 级别日志捕获，侧边栏独立页面查看
+- [x] **从浏览器读取 Cookie** — 支持 Chrome/Safari/Firefox/Edge
+- [x] **视频封面代理** — 通过 Rust 后端代理获取封面图片（解决 WebView 外部图片限制）
+- [x] **三路径配置** — 视频/音频/转录结果独立输出目录
+- [x] **Toast 通知** — 自动消失 + 手动关闭
 
 ---
 
@@ -574,11 +571,13 @@ config.toml
 
 ## 九、注意事项
 
-1. **外部依赖**: yt-dlp 和 ffmpeg 需要用户自行安装，应用会检测并提示
-2. **Cookie 有效期**: B站 Cookie 约 30 天过期，需要定期更新
-3. **Whisper 模型**: 首次使用远程 Whisper 时需要确保 API 可用
-4. **文件权限**: macOS 可能需要授权访问文件系统
-5. **网络安全**: 调用 B站 API 时需要正确的 User-Agent 和 Referer
+1. **外部依赖**: yt-dlp 和 ffmpeg 需要用户自行安装（`brew install yt-dlp ffmpeg`）
+2. **Cookie 获取**: SESSDATA 是 HttpOnly Cookie，WebView 无法读取。推荐使用「从浏览器读取」功能（需关闭浏览器）或手动导入
+3. **Cookie 有效期**: B站 Cookie 约 30 天过期，需要定期更新
+4. **Whisper 模型**: 首次使用远程 Whisper 时需要确保 API 可用
+5. **文件权限**: macOS 可能需要授权访问文件系统
+6. **网络安全**: 调用 B站 API 和 yt-dlp 时需要正确的 User-Agent 和 Referer
+7. **封面图片**: 通过 Rust 后端代理获取（WebView 外部图片加载受限）
 
 ---
 

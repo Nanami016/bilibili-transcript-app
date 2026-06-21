@@ -13,35 +13,33 @@ pub struct AppConfig {
 /// Whisper 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhisperConfig {
-    /// 模式: "openai" | "local"
     pub mode: String,
-    /// API 地址
     pub api_url: String,
-    /// API Key（可选，本地模式可留空）
     pub api_key: Option<String>,
-    /// 模型名称
     pub model: String,
 }
 
 /// B站配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BilibiliConfig {
-    /// Cookie 字符串
     pub cookie: String,
-    /// 输出目录
+    /// 视频下载目录
+    pub video_dir: String,
+    /// 音频下载目录
+    pub audio_dir: String,
+    /// 转录结果目录
+    pub transcript_dir: String,
+    /// 兼容旧配置：统一输出目录
+    #[serde(default)]
     pub output_dir: String,
 }
 
 /// AI 摘要配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSummaryConfig {
-    /// 是否启用
     pub enabled: bool,
-    /// API 地址
     pub api_url: String,
-    /// API Key
     pub api_key: Option<String>,
-    /// 模型名称
     pub model: String,
 }
 
@@ -56,7 +54,10 @@ impl Default for AppConfig {
             },
             bilibili: BilibiliConfig {
                 cookie: String::new(),
-                output_dir: "~/bilibili-voice-only".to_string(),
+                video_dir: "~/Downloads/bilibili-download/video".to_string(),
+                audio_dir: "~/Downloads/bilibili-download/audio".to_string(),
+                transcript_dir: "~/Downloads/bilibili-download/transcript".to_string(),
+                output_dir: String::new(),
             },
             ai_summary: AiSummaryConfig {
                 enabled: false,

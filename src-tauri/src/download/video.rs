@@ -1,21 +1,166 @@
 // 视频下载
 // 通过 yt-dlp 调用实现
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::path::PathBuf;
+use std::process::Command;
+
+/// 将 Cookie 字符串写入 Netscape 格式的 cookie 文件
+fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
+    let cookie_path = std::env::temp_dir().join("bilibili-transcript-cookies.txt");
+
+    let mut lines = vec!["# Netscape HTTP Cookie File".to_string()];
+
+    for part in cookie.split(';') {
+        let part = part.trim();
+        if let Some((name, value)) = part.split_once('=') {
+            let name = name.trim();
+            let value = value.trim();
+            // 格式: domain	flag	path	secure	expires	name	value
+            lines.push(format!(".bilibili.com\tTRUE\t/\tFALSE\t0\t{}\t{}", name, value));
+        }
+    }
+
+    std::fs::write(&cookie_path, lines.join("\n"))?;
+    log::debug!("Cookie 文件已写入: {:?}", cookie_path);
+    Ok(cookie_path)
+}
 
 /// 下载视频
-/// url: B站视频链接
-/// format_id: yt-dlp 格式 ID
-/// output_dir: 输出目录
-pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf) -> Result<PathBuf> {
-    // TODO: 调用 yt-dlp 下载视频
-    // yt-dlp -f {format_id} -o {output_dir}/%(title)s.%(ext)s {url}
-    todo!("实现视频下载")
+pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf, cookie: &str) -> Result<PathBuf> {
+    log::info!("开始下载视频: url={}, format={}", url, format_id);
+    log::debug!("输出目录: {:?}", output_dir);
+
+    std::fs::create_dir_all(output_dir)?;
+
+    let output_template = output_dir.join("%(title)s.%(ext)s");
+    let output_str = output_template.to_string_lossy();
+
+    let mut args = vec![
+        "-o".to_string(),
+        output_str.to_string(),
+        "--no-playlist".to_string(),
+        "--user-agent".to_string(),
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
+        "--referer".to_string(),
+        "https://www.bilibili.com".to_string(),
+    ];
+
+    // 格式选择：空或 "best" 都不传 -f，让 yt-dlp 自动选择最佳格式
+    if !format_id.is_empty() && format_id != "best" {
+        args.push("-f".to_string());
+        args.push(format_id.to_string());
+    }
+
+    // 通过 Cookie 文件传递（B站需要 Cookie 才能下载）
+    let cookie_file = if !cookie.is_empty() {
+        let path = write_cookie_file(cookie)?;
+        args.push("--cookies".to_string());
+        args.push(path.to_string_lossy().to_string());
+        log::debug!("使用 Cookie 文件: {:?}", path);
+        Some(path)
+    } else {
+        log::warn!("未配置 Cookie，下载可能会失败");
+        None
+    };
+
+    args.push(url.to_string());
+
+    log::debug!("执行 yt-dlp {:?}", args);
+
+    let output = Command::new("yt-dlp")
+        .args(&args)
+        .output()?;
+
+    // 清理 Cookie 文件
+    if let Some(path) = &cookie_file {
+        let _ = std::fs::remove_file(path);
+    }
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let err_msg = if !stderr.is_empty() { stderr.to_string() } else { stdout.to_string() };
+        log::error!("yt-dlp 下载失败: {}", err_msg);
+        bail!("yt-dlp 下载失败: {}", err_msg);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    log::debug!("yt-dlp 输出: {}", stdout);
+    let filepath = parse_download_path(&stdout, output_dir)
+        .unwrap_or_else(|| output_dir.join("download.mp4"));
+
+    log::info!("视频下载完成: {:?}", filepath);
+    Ok(filepath)
 }
 
 /// 获取视频可用格式列表
 pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Value>> {
-    // TODO: 调用 yt-dlp -F --dump-json 获取格式列表
-    todo!("实现格式列表获取")
+    log::info!("获取视频格式列表: {}", url);
+
+    let mut args = vec![
+        "-F".to_string(),
+        "--dump-json".to_string(),
+        "--user-agent".to_string(),
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
+        "--referer".to_string(),
+        "https://www.bilibili.com".to_string(),
+    ];
+
+    let cookie_file = if !cookie.is_empty() {
+        let path = write_cookie_file(cookie)?;
+        args.push("--cookies".to_string());
+        args.push(path.to_string_lossy().to_string());
+        Some(path)
+    } else {
+        None
+    };
+
+    args.push(url.to_string());
+
+    let output = Command::new("yt-dlp")
+        .args(&args)
+        .output()?;
+
+    if let Some(path) = &cookie_file {
+        let _ = std::fs::remove_file(path);
+    }
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::error!("yt-dlp 获取格式失败: {}", stderr);
+        bail!("yt-dlp 获取格式失败: {}", stderr);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut formats = Vec::new();
+
+    for line in stdout.lines() {
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
+            formats.push(data);
+        }
+    }
+
+    log::info!("格式列表获取成功: {} 个格式", formats.len());
+    Ok(formats)
+}
+
+/// 从 yt-dlp 输出中解析下载的文件路径
+fn parse_download_path(output: &str, _output_dir: &PathBuf) -> Option<PathBuf> {
+    for line in output.lines() {
+        if line.contains("Destination:") {
+            if let Some(path) = line.split("Destination:").nth(1) {
+                return Some(PathBuf::from(path.trim()));
+            }
+        }
+        if line.contains("has already been downloaded") {
+            if let Some(path) = line.split("has already been downloaded").next() {
+                let path = path.trim();
+                if let Some(path) = path.strip_prefix("[download]") {
+                    return Some(PathBuf::from(path.trim()));
+                }
+            }
+        }
+    }
+    None
 }

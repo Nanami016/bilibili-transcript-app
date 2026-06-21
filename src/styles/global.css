@@ -273,6 +273,118 @@ body {
   justify-content: flex-end;
 }
 
+/* Cookie 教程 */
+.cookie-tutorial {
+  margin-top: 12px;
+}
+
+.tutorial-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.step-content p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.step-content code {
+  background-color: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: "SF Mono", Monaco, Consolas, monospace;
+}
+
+.step-content kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: "SF Mono", Monaco, Consolas, monospace;
+  background-color: #f5f5f5;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.cookie-fields {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cookie-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #f8f8f8;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}
+
+.cookie-field code {
+  font-weight: 600;
+  color: var(--primary-color);
+  background-color: transparent;
+  padding: 0;
+}
+
+.field-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* B站登录组件 */
+.bili-login {
+  padding: 12px 0;
+}
+
+.login-actions {
+  margin-bottom: 8px;
+}
+
+.login-flow {
+  padding: 16px;
+  background-color: #f0f8ff;
+  border-radius: var(--radius);
+  border: 1px solid #d0e8ff;
+}
+
 /* Favorites */
 .favorites-list {
   display: grid;

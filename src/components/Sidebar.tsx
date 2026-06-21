@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Star, Settings } from "lucide-react";
+import { Home, Star, ScrollText, Settings } from "lucide-react";
 
 function Sidebar() {
   const location = useLocation();
@@ -28,6 +28,13 @@ function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
+        <Link
+          to="/logs"
+          className={`nav-item ${location.pathname === "/logs" ? "active" : ""}`}
+        >
+          <ScrollText size={20} />
+          <span>运行日志</span>
+        </Link>
         <Link
           to="/settings"
           className={`nav-item ${location.pathname === "/settings" ? "active" : ""}`}
