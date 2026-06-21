@@ -18,13 +18,6 @@ pub async fn get_cookie_status() -> Result<bool, String> {
     Ok(crate::bilibili::cookie::has_cookie())
 }
 
-/// 获取当前 Cookie
-#[command]
-pub async fn get_cookie() -> Result<String, String> {
-    crate::bilibili::cookie::get_cookie()
-        .map_err(|e| e.to_string())
-}
-
 /// 从浏览器读取 Cookie 并保存
 /// 使用 yt-dlp 的 --cookies-from-browser 功能
 #[command]

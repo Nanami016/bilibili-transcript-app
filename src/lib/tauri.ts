@@ -30,7 +30,6 @@ export const updateConfig = (config: any) => invoke("update_config", { config })
 // Cookie 相关
 export const importCookie = (cookie: string) => invoke("import_cookie", { cookie });
 export const getCookieStatus = () => invoke("get_cookie_status");
-export const getCookie = () => invoke("get_cookie");
 export const importCookieFromBrowser = (browser: string) =>
   invoke("import_cookie_from_browser", { browser });
 
