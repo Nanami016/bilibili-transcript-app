@@ -2,12 +2,12 @@
 // 从数据库记录生成格式化的 TXT 文件
 
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::database::TranscriptRecord;
 
 /// 渲染 TXT 文件
-pub fn render_txt(record: &TranscriptRecord, output_dir: &PathBuf) -> Result<PathBuf> {
+pub fn render_txt(record: &TranscriptRecord, output_dir: &Path) -> Result<PathBuf> {
     // 按发布年月组织目录
     let year = &record.upload_date[..4.min(record.upload_date.len())];
     let month = &record.upload_date[5..7.min(record.upload_date.len())];

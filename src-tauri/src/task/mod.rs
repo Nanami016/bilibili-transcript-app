@@ -20,6 +20,12 @@ pub struct TaskManager {
     active_tasks: Arc<Mutex<HashMap<i64, ActiveTask>>>,
 }
 
+impl Default for TaskManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskManager {
     pub fn new() -> Self {
         Self {
@@ -35,7 +41,7 @@ impl TaskManager {
         format_id: String,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
-        let task_id = task::insert_task(&db.conn(), "video_download", &url, "", "")
+        let task_id = task::insert_task(db.conn(), "video_download", &url, "", "")
             .map_err(|e| e.to_string())?;
 
         let active = self.active_tasks.clone();
@@ -77,7 +83,7 @@ impl TaskManager {
                     // 更新标题
                     let db = Database::open().ok();
                     if let Some(db) = db {
-                        let _ = task::update_task_title(&db.conn(), task_id, &title);
+                        let _ = task::update_task_title(db.conn(), task_id, &title);
                     }
 
                     let _ = Self::mark_completed(&app_clone, task_id, "video_download", &title, Some(&path.to_string_lossy()), file_size.as_deref());
@@ -101,7 +107,7 @@ impl TaskManager {
         url: String,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
-        let task_id = task::insert_task(&db.conn(), "audio_download", &url, "", "")
+        let task_id = task::insert_task(db.conn(), "audio_download", &url, "", "")
             .map_err(|e| e.to_string())?;
 
         let active = self.active_tasks.clone();
@@ -139,7 +145,7 @@ impl TaskManager {
 
                     let db = Database::open().ok();
                     if let Some(db) = db {
-                        let _ = task::update_task_title(&db.conn(), task_id, &title);
+                        let _ = task::update_task_title(db.conn(), task_id, &title);
                     }
 
                     let _ = Self::mark_completed(&app_clone, task_id, "audio_download", &title, Some(&path.to_string_lossy()), file_size.as_deref());
@@ -163,7 +169,7 @@ impl TaskManager {
         url: String,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
-        let task_id = task::insert_task(&db.conn(), "transcribe", &url, "", "")
+        let task_id = task::insert_task(db.conn(), "transcribe", &url, "", "")
             .map_err(|e| e.to_string())?;
 
         let active = self.active_tasks.clone();
@@ -203,7 +209,7 @@ impl TaskManager {
             {
                 let db = Database::open().ok();
                 if let Some(db) = db {
-                    let _ = task::update_task_title(&db.conn(), task_id, &video_info.title);
+                    let _ = task::update_task_title(db.conn(), task_id, &video_info.title);
                 }
             }
 
@@ -276,7 +282,7 @@ impl TaskManager {
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
         let url = format!("https://www.bilibili.com/video/{}", bvid);
-        let task_id = task::insert_task(&db.conn(), "ai_summary", &url, "", "")
+        let task_id = task::insert_task(db.conn(), "ai_summary", &url, "", "")
             .map_err(|e| e.to_string())?;
 
         let active = self.active_tasks.clone();
@@ -317,7 +323,7 @@ impl TaskManager {
             };
 
             // 更新标题
-            let _ = task::update_task_title(&db.conn(), task_id, &record.title);
+            let _ = task::update_task_title(db.conn(), task_id, &record.title);
 
             let _ = app_clone.emit("task-progress", task::TaskProgressEvent {
                 task_id,
@@ -368,7 +374,7 @@ impl TaskManager {
             task.handle.abort();
 
             let db = Database::open().map_err(|e| e.to_string())?;
-            task::update_task_status(&db.conn(), task_id, "cancelled", None, None, None)
+            task::update_task_status(db.conn(), task_id, "cancelled", None, None, None)
                 .map_err(|e| e.to_string())?;
 
             Ok(())
@@ -387,7 +393,7 @@ impl TaskManager {
         file_size: Option<&str>,
     ) -> Result<(), String> {
         let db = Database::open().map_err(|e| e.to_string())?;
-        task::update_task_status(&db.conn(), task_id, "completed", output_path, None, file_size)
+        task::update_task_status(db.conn(), task_id, "completed", output_path, None, file_size)
             .map_err(|e| e.to_string())?;
 
         let _ = app.emit("task-completed", task::TaskCompletedEvent {
@@ -411,7 +417,7 @@ impl TaskManager {
         error: &str,
     ) -> Result<(), String> {
         let db = Database::open().map_err(|e| e.to_string())?;
-        task::update_task_status(&db.conn(), task_id, "failed", None, Some(error), None)
+        task::update_task_status(db.conn(), task_id, "failed", None, Some(error), None)
             .map_err(|e| e.to_string())?;
 
         let _ = app.emit("task-completed", task::TaskCompletedEvent {

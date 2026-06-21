@@ -175,9 +175,13 @@ npm run tauri dev
 
 ### 提交规范
 
-项目使用分支保护，所有变更需通过 PR 合并：
+项目使用分支保护，所有变更需通过 PR 合并，且必须通过 Linter 检查：
 
 ```bash
+# 提交前运行 Linter
+npm run lint           # TypeScript/React
+npm run lint:rust      # Rust (clippy)
+
 git checkout -b feat/your-feature
 # ... 修改代码 ...
 git commit -m "feat: 描述你的改动"

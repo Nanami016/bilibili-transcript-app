@@ -105,6 +105,7 @@ pub async fn get_task_output_dir(task_type: String) -> Result<String, String> {
 
 /// 打开文件夹
 #[command]
+#[allow(deprecated)]
 pub async fn open_folder(app: AppHandle, path: String) -> Result<(), String> {
     // 确保目录存在
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
