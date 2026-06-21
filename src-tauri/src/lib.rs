@@ -9,4 +9,5 @@ pub mod config;
 pub mod download;
 pub mod storage;
 pub mod summary;
+pub mod task;
 pub mod transcribe;

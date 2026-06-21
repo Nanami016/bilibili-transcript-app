@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import InputBar from "../components/InputBar";
 import VideoCard from "../components/VideoCard";
-import { parseVideo, downloadVideo, downloadAudio, transcribe, fetchCover } from "../lib/tauri";
+import {
+  parseVideo,
+  fetchCover,
+  getVideoFormats,
+  startVideoDownload,
+  startAudioDownload,
+  startTranscribe,
+  startAiSummary,
+} from "../lib/tauri";
 
 interface VideoInfo {
   bvid: string;
@@ -15,17 +23,18 @@ interface VideoInfo {
   upload_date: string;
 }
 
-interface TranscriptResult {
-  text: string;
-  source: string;
-  language: string | null;
+interface VideoFormat {
+  format_id: string;
+  quality: string;
+  description: string;
+  filesize: number | null;
 }
 
 function Home() {
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [formats, setFormats] = useState<VideoFormat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [transcriptResult, setTranscriptResult] = useState<TranscriptResult | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
@@ -41,7 +50,7 @@ function Home() {
     setLoading(true);
     setError(null);
     setVideoInfo(null);
-    setTranscriptResult(null);
+    setFormats([]);
 
     try {
       const info = await parseVideo(url);
@@ -59,6 +68,15 @@ function Home() {
       }
 
       setVideoInfo(vi);
+
+      // 获取可用格式列表
+      try {
+        const videoUrl = `https://www.bilibili.com/video/${vi.bvid}`;
+        const fmts = await getVideoFormats(videoUrl);
+        setFormats(fmts as VideoFormat[]);
+      } catch (e) {
+        console.error("获取格式列表失败:", e);
+      }
     } catch (err) {
       setError(String(err));
     } finally {
@@ -66,15 +84,15 @@ function Home() {
     }
   };
 
-  const handleDownloadVideo = async () => {
+  const handleDownloadVideo = async (formatId: string = "best") => {
     if (!videoInfo) return;
     setActionLoading("downloadVideo");
     try {
       const url = `https://www.bilibili.com/video/${videoInfo.bvid}`;
-      const result = await downloadVideo(url, "best");
-      setToast({ message: `视频已下载: ${result}`, type: "success" });
+      await startVideoDownload(url, formatId);
+      setToast({ message: "视频下载任务已启动", type: "info" });
     } catch (err) {
-      setToast({ message: `下载失败: ${err}`, type: "error" });
+      setToast({ message: `启动失败: ${err}`, type: "error" });
     } finally {
       setActionLoading(null);
     }
@@ -85,10 +103,10 @@ function Home() {
     setActionLoading("downloadAudio");
     try {
       const url = `https://www.bilibili.com/video/${videoInfo.bvid}`;
-      const result = await downloadAudio(url);
-      setToast({ message: `音频已下载: ${result}`, type: "success" });
+      await startAudioDownload(url);
+      setToast({ message: "音频下载任务已启动", type: "info" });
     } catch (err) {
-      setToast({ message: `下载失败: ${err}`, type: "error" });
+      setToast({ message: `启动失败: ${err}`, type: "error" });
     } finally {
       setActionLoading(null);
     }
@@ -97,24 +115,28 @@ function Home() {
   const handleTranscribe = async () => {
     if (!videoInfo) return;
     setActionLoading("transcribe");
-    setTranscriptResult(null);
     try {
       const url = `https://www.bilibili.com/video/${videoInfo.bvid}`;
-      const result = (await transcribe(url)) as TranscriptResult;
-      setTranscriptResult(result);
-      setToast({
-        message: `转录完成 (${result.source === "cc" ? "CC字幕" : result.source === "ai" ? "AI字幕" : "Whisper"})`,
-        type: "success",
-      });
+      await startTranscribe(url);
+      setToast({ message: "转录任务已启动", type: "info" });
     } catch (err) {
-      setToast({ message: `转录失败: ${err}`, type: "error" });
+      setToast({ message: `启动失败: ${err}`, type: "error" });
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleSummarize = () => {
-    setToast({ message: "AI 摘要功能需要先在设置中配置", type: "info" });
+  const handleSummarize = async () => {
+    if (!videoInfo) return;
+    setActionLoading("aiSummary");
+    try {
+      await startAiSummary(videoInfo.bvid);
+      setToast({ message: "AI 摘要任务已启动", type: "info" });
+    } catch (err) {
+      setToast({ message: `启动失败: ${err}`, type: "error" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const formatDuration = (seconds: number) => {
@@ -150,6 +172,7 @@ function Home() {
               author={videoInfo.author}
               duration={formatDuration(videoInfo.duration)}
               coverUrl={videoInfo.cover_url}
+              formats={formats}
               onDownloadVideo={handleDownloadVideo}
               onDownloadAudio={handleDownloadAudio}
               onTranscribe={handleTranscribe}
@@ -159,35 +182,12 @@ function Home() {
             {actionLoading && (
               <div className="loading">
                 {actionLoading === "transcribe"
-                  ? "正在转录，请稍候..."
+                  ? "正在启动转录任务..."
                   : actionLoading === "downloadVideo"
-                  ? "正在下载视频..."
-                  : "正在下载音频..."}
-              </div>
-            )}
-
-            {transcriptResult && (
-              <div className="settings-section" style={{ marginTop: 16 }}>
-                <h3>
-                  📝 转录结果
-                  <span style={{ fontSize: 12, color: "#666", marginLeft: 8 }}>
-                    来源: {transcriptResult.source === "cc" ? "CC字幕" : transcriptResult.source === "ai" ? "AI字幕" : "Whisper"}
-                  </span>
-                </h3>
-                <div
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    lineHeight: 1.8,
-                    maxHeight: 400,
-                    overflow: "auto",
-                    padding: 16,
-                    background: "#f9f9f9",
-                    borderRadius: 8,
-                    marginTop: 12,
-                  }}
-                >
-                  {transcriptResult.text}
-                </div>
+                  ? "正在启动视频下载..."
+                  : actionLoading === "aiSummary"
+                  ? "正在启动 AI 分析..."
+                  : "正在启动音频下载..."}
               </div>
             )}
           </>

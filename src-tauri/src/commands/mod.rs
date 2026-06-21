@@ -6,5 +6,6 @@ pub mod cookie;
 pub mod favorite;
 pub mod history;
 pub mod log;
+pub mod task;
 pub mod transcribe;
 pub mod video;

@@ -38,7 +38,13 @@ impl Database {
         let conn = Connection::open(db_path)?;
         let db = Self { conn };
         db.init_table()?;
+        super::task::init_tasks_table(&db.conn)?;
         Ok(db)
+    }
+
+    /// 获取底层连接引用
+    pub fn conn(&self) -> &Connection {
+        &self.conn
     }
 
     /// 数据库文件路径

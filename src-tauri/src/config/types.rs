@@ -29,6 +29,9 @@ pub struct BilibiliConfig {
     pub audio_dir: String,
     /// 转录结果目录
     pub transcript_dir: String,
+    /// AI 分析结果目录
+    #[serde(default)]
+    pub ai_analysis_dir: String,
     /// 兼容旧配置：统一输出目录
     #[serde(default)]
     pub output_dir: String,
@@ -54,9 +57,10 @@ impl Default for AppConfig {
             },
             bilibili: BilibiliConfig {
                 cookie: String::new(),
-                video_dir: "~/Downloads/bilibili-download/video".to_string(),
-                audio_dir: "~/Downloads/bilibili-download/audio".to_string(),
-                transcript_dir: "~/Downloads/bilibili-download/transcript".to_string(),
+                video_dir: "~/Downloads/bilibili-transcript-app/bilibili-video".to_string(),
+                audio_dir: "~/Downloads/bilibili-transcript-app/bilibili-audio".to_string(),
+                transcript_dir: "~/Downloads/bilibili-transcript-app/bilibili-transfer".to_string(),
+                ai_analysis_dir: "~/Downloads/bilibili-transcript-app/bilibili-ai-analysis".to_string(),
                 output_dir: String::new(),
             },
             ai_summary: AiSummaryConfig {

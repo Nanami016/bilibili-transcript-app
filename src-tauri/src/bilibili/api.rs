@@ -172,14 +172,59 @@ pub async fn get_favorite_videos(media_id: i64, cookie: &str) -> Result<Vec<Vide
     Ok(videos)
 }
 
+/// 将 Cookie 字符串写入 Netscape 格式的 cookie 文件
+fn write_cookie_file(cookie: &str) -> Result<std::path::PathBuf> {
+    let cookie_path = std::env::temp_dir().join("bilibili-transcript-cookies.txt");
+    let mut lines = vec!["# Netscape HTTP Cookie File".to_string()];
+    for part in cookie.split(';') {
+        let part = part.trim();
+        if let Some((name, value)) = part.split_once('=') {
+            let name = name.trim();
+            let value = value.trim();
+            lines.push(format!(".bilibili.com\tTRUE\t/\tFALSE\t0\t{}\t{}", name, value));
+        }
+    }
+    std::fs::write(&cookie_path, lines.join("\n"))?;
+    Ok(cookie_path)
+}
+
 /// 获取视频可用格式列表（通过 yt-dlp）
-pub async fn get_video_formats(url: &str, _cookie: &str) -> Result<Vec<VideoFormat>> {
+pub async fn get_video_formats(url: &str, cookie: &str) -> Result<Vec<VideoFormat>> {
     log::info!("获取视频格式列表: url={}", url);
     use std::process::Command;
 
+    let mut args = vec![
+        "-F".to_string(),
+        "--dump-json".to_string(),
+        "--no-playlist".to_string(),
+        "--user-agent".to_string(),
+        USER_AGENT.to_string(),
+        "--referer".to_string(),
+        "https://www.bilibili.com".to_string(),
+    ];
+
+    // 通过 Cookie 文件传递
+    let cookie_file = if !cookie.is_empty() {
+        let path = write_cookie_file(cookie)?;
+        args.push("--cookies".to_string());
+        args.push(path.to_string_lossy().to_string());
+        log::debug!("使用 Cookie 文件: {:?}", path);
+        Some(path)
+    } else {
+        log::warn!("未配置 Cookie，格式列表可能不完整");
+        None
+    };
+
+    args.push(url.to_string());
+
     let output = Command::new("yt-dlp")
-        .args(["-F", "--dump-json", url])
+        .args(&args)
         .output()?;
+
+    // 清理 Cookie 文件
+    if let Some(path) = &cookie_file {
+        let _ = std::fs::remove_file(path);
+    }
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -188,29 +233,98 @@ pub async fn get_video_formats(url: &str, _cookie: &str) -> Result<Vec<VideoForm
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut formats = Vec::new();
+
+    // 解析所有视频格式
+    struct RawFormat {
+        format_id: String,
+        height: i64,
+        ext: String,
+        filesize: Option<i64>,
+    }
+
+    let mut raw_formats: Vec<RawFormat> = Vec::new();
 
     for line in stdout.lines() {
         if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
             let format_id = data["format_id"].as_str().unwrap_or("").to_string();
+            let vcodec = data["vcodec"].as_str().unwrap_or("").to_string();
             let ext = data["ext"].as_str().unwrap_or("").to_string();
-            let resolution = data["resolution"].as_str().unwrap_or("").to_string();
-            let note = data["format_note"].as_str().unwrap_or("").to_string();
             let filesize = data["filesize"].as_i64().or_else(|| data["filesize_approx"].as_i64());
 
-            let description = if !note.is_empty() {
-                format!("{} ({}) {}", resolution, ext, note)
-            } else {
-                format!("{} ({})", resolution, ext)
-            };
+            // 跳过纯音频格式
+            if vcodec == "none" {
+                continue;
+            }
 
-            formats.push(VideoFormat {
-                format_id,
-                quality: resolution,
-                description,
-                filesize,
+            // 从 height 字段获取高度，如果没有则从 resolution 解析
+            let height = data["height"].as_i64().unwrap_or_else(|| {
+                let resolution = data["resolution"].as_str().unwrap_or("");
+                if let Some(h_str) = resolution.split('x').nth(1) {
+                    h_str.parse::<i64>().unwrap_or(0)
+                } else {
+                    0
+                }
             });
+
+            if height > 0 {
+                raw_formats.push(RawFormat {
+                    format_id,
+                    height,
+                    ext,
+                    filesize,
+                });
+            }
         }
+    }
+
+    // 按标准清晰度分组，每个清晰度保留最佳格式（优先 mp4，文件最大的）
+    let standard_resolutions = [2160, 1440, 1080, 720, 480, 360];
+    let mut formats: Vec<VideoFormat> = Vec::new();
+
+    for &target_height in &standard_resolutions {
+        // 找到最接近目标高度的格式（允许 ±10% 误差）
+        let min_h = (target_height as f64 * 0.9) as i64;
+        let max_h = (target_height as f64 * 1.1) as i64;
+
+        let candidates: Vec<&RawFormat> = raw_formats
+            .iter()
+            .filter(|f| f.height >= min_h && f.height <= max_h)
+            .collect();
+
+        if candidates.is_empty() {
+            continue;
+        }
+
+        // 优先选择 mp4 格式，然后选择 filesize 最大的
+        let best = candidates
+            .iter()
+            .max_by_key(|f| {
+                let ext_score = if f.ext == "mp4" { 1000 } else { 0 };
+                let size_score = f.filesize.unwrap_or(0);
+                ext_score + size_score
+            })
+            .unwrap();
+
+        let quality = format!("{}P", target_height);
+        let size_str = best
+            .filesize
+            .map(|s| {
+                if s >= 1024 * 1024 * 1024 {
+                    format!(" {:.1}GB", s as f64 / (1024.0 * 1024.0 * 1024.0))
+                } else if s >= 1024 * 1024 {
+                    format!(" {:.1}MB", s as f64 / (1024.0 * 1024.0))
+                } else {
+                    String::new()
+                }
+            })
+            .unwrap_or_default();
+
+        formats.push(VideoFormat {
+            format_id: best.format_id.clone(),
+            quality: quality.clone(),
+            description: format!("{}{}", quality, size_str),
+            filesize: best.filesize,
+        });
     }
 
     log::info!("视频格式列表获取成功: {} 个格式", formats.len());

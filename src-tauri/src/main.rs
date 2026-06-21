@@ -10,6 +10,7 @@ mod config;
 mod download;
 mod storage;
 mod summary;
+mod task;
 mod transcribe;
 
 use config::AppConfig;
@@ -28,6 +29,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(app_config)
+        .manage(task::TaskManager::new())
         .invoke_handler(tauri::generate_handler![
             commands::video::parse_video,
             commands::video::get_video_formats,
@@ -49,6 +51,17 @@ fn main() {
             commands::cookie::import_cookie_from_browser,
             commands::log::get_run_logs,
             commands::log::clear_run_logs,
+            commands::task::get_task_history,
+            commands::task::get_active_tasks,
+            commands::task::start_video_download,
+            commands::task::start_audio_download,
+            commands::task::start_transcribe,
+            commands::task::start_ai_summary,
+            commands::task::cancel_task,
+            commands::task::delete_task_record,
+            commands::task::clear_task_history,
+            commands::task::get_task_output_dir,
+            commands::task::open_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

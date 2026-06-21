@@ -198,7 +198,7 @@ function Settings() {
               type="text"
               value={config?.bilibili?.video_dir || ""}
               onChange={(e) => updateField("bilibili", "video_dir", e.target.value)}
-              placeholder="~/Downloads/bilibili-download/video"
+              placeholder="~/Downloads/bilibili-transcript-app/bilibili-video"
             />
           </div>
           <div className="form-group">
@@ -207,7 +207,7 @@ function Settings() {
               type="text"
               value={config?.bilibili?.audio_dir || ""}
               onChange={(e) => updateField("bilibili", "audio_dir", e.target.value)}
-              placeholder="~/Downloads/bilibili-download/audio"
+              placeholder="~/Downloads/bilibili-transcript-app/bilibili-audio"
             />
           </div>
           <div className="form-group">
@@ -216,7 +216,16 @@ function Settings() {
               type="text"
               value={config?.bilibili?.transcript_dir || ""}
               onChange={(e) => updateField("bilibili", "transcript_dir", e.target.value)}
-              placeholder="~/Downloads/bilibili-download/transcript"
+              placeholder="~/Downloads/bilibili-transcript-app/bilibili-transfer"
+            />
+          </div>
+          <div className="form-group">
+            <label>AI 分析结果路径</label>
+            <input
+              type="text"
+              value={config?.bilibili?.ai_analysis_dir || ""}
+              onChange={(e) => updateField("bilibili", "ai_analysis_dir", e.target.value)}
+              placeholder="~/Downloads/bilibili-transcript-app/bilibili-ai-analysis"
             />
           </div>
         </div>
