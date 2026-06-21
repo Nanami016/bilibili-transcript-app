@@ -38,7 +38,13 @@ impl Database {
         let conn = Connection::open(db_path)?;
         let db = Self { conn };
         db.init_table()?;
+        super::task::init_tasks_table(&db.conn)?;
         Ok(db)
+    }
+
+    /// 获取底层连接引用
+    pub fn conn(&self) -> &Connection {
+        &self.conn
     }
 
     /// 数据库文件路径
@@ -71,19 +77,115 @@ impl Database {
 
     /// 插入或更新转录记录
     pub fn upsert(&self, record: &TranscriptRecord) -> Result<()> {
-        // TODO: 实现插入/更新逻辑
-        todo!("实现数据库插入/更新")
+        self.conn.execute(
+            "INSERT INTO transcripts (bvid, url, title, author, duration, upload_date, transcript_source, transcript_text, summary, status, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, datetime('now', 'localtime'))
+             ON CONFLICT(bvid) DO UPDATE SET
+                url = excluded.url,
+                title = excluded.title,
+                author = excluded.author,
+                duration = excluded.duration,
+                upload_date = excluded.upload_date,
+                transcript_source = excluded.transcript_source,
+                transcript_text = excluded.transcript_text,
+                summary = COALESCE(excluded.summary, transcripts.summary),
+                status = excluded.status,
+                updated_at = datetime('now', 'localtime')",
+            rusqlite::params![
+                record.bvid,
+                record.url,
+                record.title,
+                record.author,
+                record.duration,
+                record.upload_date,
+                record.transcript_source,
+                record.transcript_text,
+                record.summary,
+                record.status,
+            ],
+        )?;
+        Ok(())
     }
 
     /// 根据 bvid 查询
     pub fn get_by_bvid(&self, bvid: &str) -> Result<Option<TranscriptRecord>> {
-        // TODO: 实现查询逻辑
-        todo!("实现数据库查询")
+        let mut stmt = self.conn.prepare(
+            "SELECT id, bvid, url, title, author, duration, upload_date, transcript_source, transcript_text, summary, status, created_at, updated_at
+             FROM transcripts WHERE bvid = ?1"
+        )?;
+
+        let mut rows = stmt.query_map(rusqlite::params![bvid], |row| {
+            Ok(TranscriptRecord {
+                id: row.get(0)?,
+                bvid: row.get(1)?,
+                url: row.get(2)?,
+                title: row.get(3)?,
+                author: row.get(4)?,
+                duration: row.get(5)?,
+                upload_date: row.get(6)?,
+                transcript_source: row.get(7)?,
+                transcript_text: row.get(8)?,
+                summary: row.get(9)?,
+                status: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+            })
+        })?;
+
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
     }
 
     /// 获取所有记录
     pub fn get_all(&self) -> Result<Vec<TranscriptRecord>> {
-        // TODO: 实现查询所有记录
-        todo!("实现数据库查询所有")
+        let mut stmt = self.conn.prepare(
+            "SELECT id, bvid, url, title, author, duration, upload_date, transcript_source, transcript_text, summary, status, created_at, updated_at
+             FROM transcripts ORDER BY updated_at DESC"
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(TranscriptRecord {
+                id: row.get(0)?,
+                bvid: row.get(1)?,
+                url: row.get(2)?,
+                title: row.get(3)?,
+                author: row.get(4)?,
+                duration: row.get(5)?,
+                upload_date: row.get(6)?,
+                transcript_source: row.get(7)?,
+                transcript_text: row.get(8)?,
+                summary: row.get(9)?,
+                status: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+            })
+        })?;
+
+        let mut records = Vec::new();
+        for row in rows {
+            records.push(row?);
+        }
+
+        Ok(records)
+    }
+
+    /// 更新摘要
+    pub fn update_summary(&self, bvid: &str, summary: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE transcripts SET summary = ?1, updated_at = datetime('now', 'localtime') WHERE bvid = ?2",
+            rusqlite::params![summary, bvid],
+        )?;
+        Ok(())
+    }
+
+    /// 删除记录
+    pub fn delete(&self, bvid: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM transcripts WHERE bvid = ?1",
+            rusqlite::params![bvid],
+        )?;
+        Ok(())
     }
 }

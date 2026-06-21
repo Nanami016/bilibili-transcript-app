@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://api.openai.com https://*.openai.com https://api.bilibili.com https://*.bilibili.com ipc: http://ipc.localhost; font-src 'self' data:"
     }
   },
   "bundle": {
@@ -28,7 +28,8 @@
     "targets": "all",
     "icon": [
       "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/icon.png"
     ],
     "macOS": {
       "minimumSystemVersion": "12.0"
