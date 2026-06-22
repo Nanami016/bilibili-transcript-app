@@ -111,7 +111,7 @@ pub async fn get_favorites(cookie: &str) -> Result<Vec<FavoriteFolder>> {
         .ok_or_else(|| anyhow::anyhow!("无法从 Cookie 中提取用户 ID (DedeUserID)，请检查 Cookie 是否正确"))?;
 
     let url = format!(
-        "https://api.bilibili.com/x/v3/fav/folder/created?up_mid={}&ps=50&pn=1",
+        "https://api.bilibili.com/x/v3/fav/folder/created/list-all?up_mid={}",
         uid
     );
     let data = bili_get(&url, cookie).await?;
@@ -153,6 +153,8 @@ pub async fn get_favorite_videos(media_id: i64, cookie: &str) -> Result<Vec<Vide
             let duration = item["duration"].as_i64().unwrap_or(0);
             let description = item["intro"].as_str().unwrap_or("").to_string();
             let cover_url = item["cover"].as_str().unwrap_or("").to_string();
+            // B站返回的封面 URL 可能是 http://，强制转为 https://
+            let cover_url = cover_url.replace("http://", "https://");
 
             videos.push(VideoInfo {
                 bvid,

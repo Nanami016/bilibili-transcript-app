@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { getFavorites, getFavoriteVideos, transcribe } from "../lib/tauri";
+import {
+  getFavorites,
+  getFavoriteVideos,
+  transcribe,
+  fetchCover,
+  startVideoDownload,
+  startAudioDownload,
+  startAiSummary,
+} from "../lib/tauri";
 
 interface FavoriteFolder {
   id: number;
@@ -59,7 +67,22 @@ function Favorite() {
     setVideos([]);
     try {
       const result = await getFavoriteVideos(String(folder.id));
-      setVideos(result as VideoInfo[]);
+      const videosData = result as VideoInfo[];
+
+      // 通过 Rust 代理获取封面（避免 WebView 外部图片限制）
+      const videosWithCovers = await Promise.all(
+        videosData.map(async (video) => {
+          try {
+            const coverData = await fetchCover(video.cover_url);
+            return { ...video, cover_url: coverData as string };
+          } catch (e) {
+            console.error("封面获取失败:", video.title, e);
+            return video;
+          }
+        })
+      );
+
+      setVideos(videosWithCovers);
     } catch (err) {
       setToast({ message: `获取视频列表失败: ${err}`, type: "error" });
     } finally {
@@ -79,6 +102,35 @@ function Favorite() {
       setToast({ message: `「${video.title}」转录完成`, type: "success" });
     } catch (err) {
       setToast({ message: `转录失败: ${err}`, type: "error" });
+    }
+  };
+
+  const handleDownloadVideo = async (video: VideoInfo) => {
+    try {
+      const url = `https://www.bilibili.com/video/${video.bvid}`;
+      await startVideoDownload(url, "best");
+      setToast({ message: `「${video.title}」视频下载任务已启动`, type: "info" });
+    } catch (err) {
+      setToast({ message: `下载失败: ${err}`, type: "error" });
+    }
+  };
+
+  const handleDownloadAudio = async (video: VideoInfo) => {
+    try {
+      const url = `https://www.bilibili.com/video/${video.bvid}`;
+      await startAudioDownload(url);
+      setToast({ message: `「${video.title}」音频下载任务已启动`, type: "info" });
+    } catch (err) {
+      setToast({ message: `下载失败: ${err}`, type: "error" });
+    }
+  };
+
+  const handleSummarize = async (video: VideoInfo) => {
+    try {
+      await startAiSummary(video.bvid);
+      setToast({ message: `「${video.title}」AI 摘要任务已启动`, type: "info" });
+    } catch (err) {
+      setToast({ message: `AI 摘要失败: ${err}`, type: "error" });
     }
   };
 
@@ -120,6 +172,11 @@ function Favorite() {
                       src={video.cover_url}
                       alt={video.title}
                       style={{ width: 120, height: 68, objectFit: "cover", borderRadius: 4 }}
+                      onLoad={() => console.log("封面加载成功:", video.cover_url)}
+                      onError={(e) => {
+                        console.error("封面加载失败:", video.cover_url, e);
+                        (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='68' viewBox='0 0 120 68'%3E%3Crect fill='%23f0f0f0' width='120' height='68'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='10' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3E封面%3C/text%3E%3C/svg%3E";
+                      }}
                     />
                     <div style={{ flex: 1 }}>
                       <h4 style={{ fontSize: 14, marginBottom: 4 }}>{video.title}</h4>
@@ -130,11 +187,36 @@ function Favorite() {
                   </div>
                   <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                     <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => handleDownloadVideo(video)}
+                      title="下载视频"
+                    >
+                      下载视频
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => handleDownloadAudio(video)}
+                      title="下载音频"
+                    >
+                      下载音频
+                    </button>
+                    <button
                       className="btn btn-primary"
                       style={{ fontSize: 12, padding: "6px 12px" }}
                       onClick={() => handleTranscribe(video)}
+                      title="语音转录"
                     >
                       语音转录
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      onClick={() => handleSummarize(video)}
+                      title="AI 摘要"
+                    >
+                      AI 摘要
                     </button>
                   </div>
                 </div>
