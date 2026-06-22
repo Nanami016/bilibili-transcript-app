@@ -50,8 +50,12 @@ pub async fn start_transcribe(
     app: AppHandle,
     manager: State<'_, TaskManager>,
     url: String,
+    language: Option<String>,
+    whisper_prompt: Option<String>,
+    ai_prompt: Option<String>,
+    ai_context: Option<String>,
 ) -> Result<i64, String> {
-    manager.start_transcribe(app, url).await
+    manager.start_transcribe(app, url, language, whisper_prompt, ai_prompt, ai_context).await
 }
 
 /// 启动 AI 摘要任务

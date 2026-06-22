@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import TranscribeModal from "../components/TranscribeModal";
+import type { TranscribeParams } from "../components/TranscribeModal";
 import {
   getFavorites,
   getFavoriteVideos,
@@ -37,6 +39,8 @@ function Favorite() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [showTranscribeModal, setShowTranscribeModal] = useState(false);
+  const [transcribeTarget, setTranscribeTarget] = useState<VideoInfo | null>(null);
 
   // Toast 自动消失
   useEffect(() => {
@@ -132,13 +136,22 @@ function Favorite() {
     setHasMore(false);
   };
 
-  const handleTranscribe = async (video: VideoInfo) => {
+  const handleTranscribe = (video: VideoInfo) => {
+    setTranscribeTarget(video);
+    setShowTranscribeModal(true);
+  };
+
+  const handleTranscribeConfirm = async (params: TranscribeParams) => {
+    if (!transcribeTarget) return;
+    setShowTranscribeModal(false);
     try {
-      const url = `https://www.bilibili.com/video/${video.bvid}`;
-      await startTranscribe(url);
-      setToast({ message: `「${video.title}」转录任务已启动`, type: "info" });
+      const url = `https://www.bilibili.com/video/${transcribeTarget.bvid}`;
+      await startTranscribe(url, params.language, params.whisperPrompt, params.aiPrompt, params.aiContext);
+      setToast({ message: `「${transcribeTarget.title}」转录任务已启动`, type: "info" });
     } catch (err) {
       setToast({ message: `转录失败: ${err}`, type: "error" });
+    } finally {
+      setTranscribeTarget(null);
     }
   };
 
@@ -176,6 +189,13 @@ function Favorite() {
           <button className="toast-close" onClick={() => setToast(null)}>×</button>
         </div>
       )}
+
+      <TranscribeModal
+        visible={showTranscribeModal}
+        videoTitle={transcribeTarget?.title || ""}
+        onConfirm={handleTranscribeConfirm}
+        onCancel={() => { setShowTranscribeModal(false); setTranscribeTarget(null); }}
+      />
 
       {selectedFolder ? (
         <>

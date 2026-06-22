@@ -167,6 +167,10 @@ impl TaskManager {
         &self,
         app: AppHandle,
         url: String,
+        language: Option<String>,
+        whisper_prompt: Option<String>,
+        ai_prompt: Option<String>,
+        ai_context: Option<String>,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
         let task_id = task::insert_task(db.conn(), "transcribe", &url, "", "")
@@ -226,8 +230,10 @@ impl TaskManager {
             let transcribe_start = std::time::Instant::now();
 
             // 执行转录
+            let wp = whisper_prompt.as_deref();
+            let lang = language.as_deref();
             match crate::transcribe::pipeline::transcribe_video(
-                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config,
+                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config, wp, lang,
             ).await {
                 Ok(result) => {
                     // 计算转录耗时
@@ -281,7 +287,9 @@ impl TaskManager {
                             eta: "正在生成AI摘要...".to_string(),
                         });
 
-                        match Self::run_ai_summary(&bvid, &config).await {
+                        let ap = ai_prompt.as_deref();
+                        let ac = ai_context.as_deref();
+                        match Self::run_ai_summary(&bvid, &config, ap, ac).await {
                             Ok(summary) => {
                                 let db = Database::open().ok();
                                 if let Some(db) = db {
@@ -382,6 +390,8 @@ impl TaskManager {
             }
 
             let api_key = config.ai_summary.api_key.unwrap_or_default();
+            let prompt = if config.ai_summary.prompt.is_empty() { None } else { Some(config.ai_summary.prompt.as_str()) };
+            let context = if config.ai_summary.context.is_empty() { None } else { Some(config.ai_summary.context.as_str()) };
 
             match crate::summary::openai::generate_summary(
                 &record.title,
@@ -389,6 +399,8 @@ impl TaskManager {
                 &config.ai_summary.api_url,
                 &api_key,
                 &config.ai_summary.model,
+                prompt,
+                context,
             ).await {
                 Ok(summary) => {
                     // 更新数据库
@@ -484,7 +496,7 @@ impl TaskManager {
     }
 
     /// 执行 AI 摘要（内部辅助方法）
-    async fn run_ai_summary(bvid: &str, config: &crate::config::AppConfig) -> Result<String, String> {
+    async fn run_ai_summary(bvid: &str, config: &crate::config::AppConfig, ai_prompt: Option<&str>, ai_context: Option<&str>) -> Result<String, String> {
         let api_key = config.ai_summary.api_key.as_deref()
             .filter(|k| !k.is_empty())
             .ok_or("未配置 AI 摘要 API Key")?;
@@ -494,12 +506,21 @@ impl TaskManager {
             .map_err(|e| e.to_string())?
             .ok_or("未找到转录记录")?;
 
+        let prompt = ai_prompt
+            .filter(|p| !p.is_empty())
+            .or(if config.ai_summary.prompt.is_empty() { None } else { Some(config.ai_summary.prompt.as_str()) });
+        let context = ai_context
+            .filter(|c| !c.is_empty())
+            .or(if config.ai_summary.context.is_empty() { None } else { Some(config.ai_summary.context.as_str()) });
+
         crate::summary::openai::generate_summary(
             &record.title,
             &record.transcript_text,
             &config.ai_summary.api_url,
             api_key,
             &config.ai_summary.model,
+            prompt,
+            context,
         )
         .await
         .map_err(|e| e.to_string())
