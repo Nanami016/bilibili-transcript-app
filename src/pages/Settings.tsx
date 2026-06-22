@@ -244,7 +244,7 @@ function Settings() {
           )}
         </div>
         <div className="form-group">
-          <label>API 地址</label>
+          <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
           <input
             type="text"
             value={config?.whisper?.api_url || ""}
@@ -289,7 +289,7 @@ function Settings() {
         {config?.ai_summary?.enabled && (
           <>
             <div className="form-group">
-              <label>API 地址</label>
+              <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
               <input type="text" value={config?.ai_summary?.api_url || ""} onChange={(e) => updateField("ai_summary", "api_url", e.target.value)} placeholder="https://api.openai.com/v1" />
               <p className="form-hint">填写 base URL，自动追加 /chat/completions</p>
             </div>
