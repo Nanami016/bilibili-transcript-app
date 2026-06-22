@@ -11,7 +11,7 @@ B站视频转录 macOS 原生应用 — 支持视频下载、音频提取、Whis
 | 🎬 视频下载 | ✅ 已测试 | 支持多种分辨率/格式选择 |
 | 🎵 音频下载 | ✅ 已测试 | yt-dlp 提取 + ffmpeg 转码 |
 | 📺 视频解析 | ✅ 已测试 | B站链接解析、封面获取、视频信息展示 |
-| 📁 收藏夹 | 🔨 开发中 | 浏览 B站收藏夹内容 |
+| 📁 收藏夹 | ✅ 已测试 | 浏览收藏夹、下载视频/音频、语音转录、AI 摘要 |
 | 📜 历史记录 | ✅ 已测试 | 下载/转录/AI 分析的历史记录 |
 | 📋 任务中心 | ✅ 已测试 | 实时进度追踪、历史记录、任务管理 |
 | ⚙️ 设置 | ✅ 已测试 | Cookie 导入（浏览器/手动）、输出目录配置 |
@@ -102,7 +102,7 @@ bilibili-transcript-app/
 │   │   ├── AudioDownload.tsx     #   音频下载
 │   │   ├── AudioTranscribe.tsx   #   语音转文字
 │   │   ├── AIAnalysis.tsx        #   AI 分析
-│   │   ├── Favorite.tsx          #   收藏夹（开发中）
+│   │   ├── Favorite.tsx          #   收藏夹
 │   │   ├── Settings.tsx          #   设置
 │   │   └── Logs.tsx              #   任务历史记录
 │   └── lib/tauri.ts              # Tauri API 封装
@@ -117,7 +117,7 @@ bilibili-transcript-app/
 │   │   ├── commands/             # Tauri 命令（前端可调用）
 │   │   │   ├── video.rs          #   视频相关命令
 │   │   │   ├── transcribe.rs     #   转录命令
-│   │   │   ├── favorite.rs       #   收藏夹命令（开发中）
+│   │   │   ├── favorite.rs       #   收藏夹命令
 │   │   │   ├── history.rs        #   任务历史记录命令
 │   │   │   ├── config.rs         #   配置命令
 │   │   │   ├── cookie.rs         #   Cookie 命令
