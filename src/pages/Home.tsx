@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import InputBar from "../components/InputBar";
 import VideoCard from "../components/VideoCard";
+import TranscribeModal from "../components/TranscribeModal";
+import type { TranscribeParams } from "../components/TranscribeModal";
 import {
   parseVideo,
   fetchCover,
@@ -8,7 +10,6 @@ import {
   startVideoDownload,
   startAudioDownload,
   startTranscribe,
-  startAiSummary,
 } from "../lib/tauri";
 
 interface VideoInfo {
@@ -37,6 +38,7 @@ function Home() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [showTranscribeModal, setShowTranscribeModal] = useState(false);
 
   // Toast 自动消失
   useEffect(() => {
@@ -112,26 +114,19 @@ function Home() {
     }
   };
 
-  const handleTranscribe = async () => {
+  const handleTranscribe = () => {
     if (!videoInfo) return;
+    setShowTranscribeModal(true);
+  };
+
+  const handleTranscribeConfirm = async (params: TranscribeParams) => {
+    if (!videoInfo) return;
+    setShowTranscribeModal(false);
     setActionLoading("transcribe");
     try {
       const url = `https://www.bilibili.com/video/${videoInfo.bvid}`;
-      await startTranscribe(url);
+      await startTranscribe(url, params.language, params.whisperPrompt, params.aiPrompt, params.aiContext);
       setToast({ message: "转录任务已启动", type: "info" });
-    } catch (err) {
-      setToast({ message: `启动失败: ${err}`, type: "error" });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleSummarize = async () => {
-    if (!videoInfo) return;
-    setActionLoading("aiSummary");
-    try {
-      await startAiSummary(videoInfo.bvid);
-      setToast({ message: "AI 摘要任务已启动", type: "info" });
     } catch (err) {
       setToast({ message: `启动失败: ${err}`, type: "error" });
     } finally {
@@ -156,6 +151,13 @@ function Home() {
         </div>
       )}
 
+      <TranscribeModal
+        visible={showTranscribeModal}
+        videoTitle={videoInfo?.title || ""}
+        onConfirm={handleTranscribeConfirm}
+        onCancel={() => setShowTranscribeModal(false)}
+      />
+
       <div className="content-area">
         {loading && <div className="loading">解析中...</div>}
 
@@ -176,7 +178,6 @@ function Home() {
               onDownloadVideo={handleDownloadVideo}
               onDownloadAudio={handleDownloadAudio}
               onTranscribe={handleTranscribe}
-              onSummarize={handleSummarize}
             />
 
             {actionLoading && (
@@ -185,8 +186,6 @@ function Home() {
                   ? "正在启动转录任务..."
                   : actionLoading === "downloadVideo"
                   ? "正在启动视频下载..."
-                  : actionLoading === "aiSummary"
-                  ? "正在启动 AI 分析..."
                   : "正在启动音频下载..."}
               </div>
             )}

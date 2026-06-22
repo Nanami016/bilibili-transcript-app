@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Download, FileText, Mic, Sparkles, ChevronDown } from "lucide-react";
+import { Download, FileText, Mic, ChevronDown } from "lucide-react";
 
 interface VideoFormat {
   format_id: string;
@@ -17,7 +17,6 @@ interface VideoCardProps {
   onDownloadVideo: (formatId: string) => void;
   onDownloadAudio: () => void;
   onTranscribe: () => void;
-  onSummarize: () => void;
 }
 
 function VideoCard({
@@ -29,7 +28,6 @@ function VideoCard({
   onDownloadVideo,
   onDownloadAudio,
   onTranscribe,
-  onSummarize,
 }: VideoCardProps) {
   const [showFormats, setShowFormats] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<string>("best");
@@ -126,10 +124,6 @@ function VideoCard({
         <button className="btn btn-primary" onClick={onTranscribe} title="语音转录">
           <Mic size={16} />
           <span>语音转录</span>
-        </button>
-        <button className="btn btn-secondary" onClick={onSummarize} title="AI 摘要">
-          <Sparkles size={16} />
-          <span>AI 摘要</span>
         </button>
       </div>
     </div>

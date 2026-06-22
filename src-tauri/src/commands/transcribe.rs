@@ -29,6 +29,8 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
         video_info.cid,
         &config.bilibili.cookie,
         &config,
+        None,
+        None,
     )
     .await
     .map_err(|e| format!("转录失败: {}", e))?;
@@ -70,10 +72,13 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
 pub async fn test_whisper_connection() -> Result<bool, String> {
     let config = crate::config::storage::load_config().map_err(|e| e.to_string())?;
 
+    let whisper_prompt = if config.whisper.prompt.is_empty() { None } else { Some(config.whisper.prompt.clone()) };
     let client = crate::transcribe::whisper::OpenAIWhisperClient::new(
         config.whisper.api_url.clone(),
         config.whisper.api_key.clone(),
         config.whisper.model.clone(),
+        whisper_prompt,
+        None,
     );
 
     crate::transcribe::whisper::WhisperClient::test_connection(&client)

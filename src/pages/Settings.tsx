@@ -219,15 +219,6 @@ function Settings() {
               placeholder="~/Downloads/bilibili-transcript-app/bilibili-transfer"
             />
           </div>
-          <div className="form-group">
-            <label>AI 分析结果路径</label>
-            <input
-              type="text"
-              value={config?.bilibili?.ai_analysis_dir || ""}
-              onChange={(e) => updateField("bilibili", "ai_analysis_dir", e.target.value)}
-              placeholder="~/Downloads/bilibili-transcript-app/bilibili-ai-analysis"
-            />
-          </div>
         </div>
       </div>
 
@@ -243,9 +234,17 @@ function Settings() {
             <option value="openai">OpenAI 格式（远程 API）</option>
             <option value="local">本地 REST API（whisper.cpp 等）</option>
           </select>
+          {config?.whisper?.mode === "local" && (
+            <p className="form-hint" style={{ marginTop: 4 }}>
+              💡 本地 Whisper 服务部署可参考项目：
+              <a href="https://github.com/Nanami016/whisper-server" target="_blank" rel="noopener noreferrer" style={{ color: "#1890ff", marginLeft: 4 }}>
+                whisper-server
+              </a>
+            </p>
+          )}
         </div>
         <div className="form-group">
-          <label>API 地址</label>
+          <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
           <input
             type="text"
             value={config?.whisper?.api_url || ""}
@@ -290,8 +289,9 @@ function Settings() {
         {config?.ai_summary?.enabled && (
           <>
             <div className="form-group">
-              <label>API 地址</label>
-              <input type="text" value={config?.ai_summary?.api_url || ""} onChange={(e) => updateField("ai_summary", "api_url", e.target.value)} placeholder="https://api.openai.com/v1/chat/completions" />
+              <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
+              <input type="text" value={config?.ai_summary?.api_url || ""} onChange={(e) => updateField("ai_summary", "api_url", e.target.value)} placeholder="https://api.openai.com/v1" />
+              <p className="form-hint">填写 base URL，自动追加 /chat/completions</p>
             </div>
             <div className="form-group">
               <label>API Key</label>

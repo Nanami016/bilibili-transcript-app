@@ -15,8 +15,8 @@ export const testWhisperConnection = () => invoke("test_whisper_connection");
 
 // 收藏夹相关
 export const getFavorites = () => invoke("get_favorites");
-export const getFavoriteVideos = (mediaId: string) =>
-  invoke("get_favorite_videos", { mediaId });
+export const getFavoriteVideos = (mediaId: string, page: number = 1) =>
+  invoke("get_favorite_videos", { mediaId, page });
 
 // 历史记录相关
 export const getTranscriptHistory = () => invoke("get_transcript_history");
@@ -82,8 +82,20 @@ export const startVideoDownload = (url: string, formatId: string) =>
   invoke<number>("start_video_download", { url, formatId });
 export const startAudioDownload = (url: string) =>
   invoke<number>("start_audio_download", { url });
-export const startTranscribe = (url: string) =>
-  invoke<number>("start_transcribe", { url });
+export const startTranscribe = (
+  url: string,
+  language?: string,
+  whisperPrompt?: string,
+  aiPrompt?: string,
+  aiContext?: string
+) =>
+  invoke<number>("start_transcribe", {
+    url,
+    language: language || null,
+    whisperPrompt: whisperPrompt || null,
+    aiPrompt: aiPrompt || null,
+    aiContext: aiContext || null,
+  });
 export const startAiSummary = (bvid: string) =>
   invoke<number>("start_ai_summary", { bvid });
 export const cancelTask = (taskId: number) =>

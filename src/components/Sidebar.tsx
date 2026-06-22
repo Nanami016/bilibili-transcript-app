@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Star, Download, Music, Brain, Mic, ScrollText, Settings } from "lucide-react";
+import { Home, Star, Download, Music, Mic, ScrollText, Settings } from "lucide-react";
 
 function Sidebar() {
   const location = useLocation();
@@ -42,13 +42,6 @@ function Sidebar() {
         >
           <Music size={18} />
           <span>音频下载</span>
-        </Link>
-        <Link
-          to="/tasks/ai"
-          className={`nav-item nav-item-sub ${location.pathname === "/tasks/ai" ? "active" : ""}`}
-        >
-          <Brain size={18} />
-          <span>AI 分析</span>
         </Link>
         <Link
           to="/tasks/transcribe"

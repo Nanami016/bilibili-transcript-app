@@ -25,6 +25,28 @@ fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
     Ok(cookie_path)
 }
 
+/// 清理文件名中的格式 ID 后缀（如 .f30033.mp3 -> .mp3）
+fn clean_format_suffix(path: &std::path::Path) -> std::path::PathBuf {
+    let filename = match path.file_stem().and_then(|n| n.to_str()) {
+        Some(f) => f,
+        None => return path.to_path_buf(),
+    };
+    let ext = match path.extension().and_then(|e| e.to_str()) {
+        Some(e) => e,
+        None => return path.to_path_buf(),
+    };
+
+    let re = regex::Regex::new(r"\.f\d+$").unwrap();
+    if re.is_match(filename) {
+        let cleaned = re.replace(filename, "");
+        if let Some(parent) = path.parent() {
+            return parent.join(format!("{}.{}", cleaned, ext));
+        }
+    }
+
+    path.to_path_buf()
+}
+
 /// 提取音频（下载 + 转 WAV）
 pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Result<PathBuf> {
     log::info!("开始提取音频: {}", url);
@@ -83,6 +105,9 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
 
     let mp3_path = find_downloaded_file(&stdout, output_dir, "mp3")
         .ok_or_else(|| anyhow::anyhow!("无法找到下载的音频文件"))?;
+
+    // 清理文件名中的格式 ID 后缀
+    let mp3_path = clean_format_suffix(&mp3_path);
     log::debug!("音频文件: {:?}", mp3_path);
 
     // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
@@ -167,25 +192,50 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
     let filepath = find_downloaded_file(&stdout, output_dir, "mp3")
         .ok_or_else(|| anyhow::anyhow!("无法找到下载的音频文件"))?;
 
-    log::info!("音频下载完成: {:?}", filepath);
-    Ok(filepath)
+    // 清理文件名中的格式 ID 后缀
+    let clean_path = clean_format_suffix(&filepath);
+    if clean_path != filepath {
+        if let Err(e) = std::fs::rename(&filepath, &clean_path) {
+            log::warn!("重命名文件失败（保留原文件名）: {}", e);
+        } else {
+            log::debug!("文件名已清理: {:?} -> {:?}", filepath, clean_path);
+        }
+    }
+
+    let result = if clean_path.exists() { clean_path } else { filepath };
+    log::info!("音频下载完成: {:?}", result);
+    Ok(result)
 }
 
 /// 从 yt-dlp 输出中查找下载的文件
 fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option<PathBuf> {
+    // 优先从 yt-dlp 输出的 Destination: 行获取路径
+    // 注意：yt-dlp -x 转换格式后，原始文件会被删除，Destination 路径可能已不存在
     for line in output.lines() {
         if line.contains("Destination:") {
             if let Some(path) = line.split("Destination:").nth(1) {
-                return Some(PathBuf::from(path.trim()));
+                let p = PathBuf::from(path.trim());
+                if p.exists() {
+                    return Some(p);
+                }
+                log::debug!("Destination 路径已不存在（可能已被格式转换删除）: {:?}", p);
             }
         }
     }
 
+    // Fallback: 扫描目录中最近修改的音频文件
+    // 优先匹配目标格式，也接受其他常见音频格式（yt-dlp 可能未能转换）
+    let audio_exts = [ext, "m4a", "wav", "ogg", "flac", "aac", "opus"];
     let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
     if let Ok(entries) = std::fs::read_dir(output_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map(|e| e == ext).unwrap_or(false) {
+            let is_audio = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| audio_exts.contains(&e))
+                .unwrap_or(false);
+            if is_audio {
                 if let Ok(metadata) = entry.metadata() {
                     if let Ok(modified) = metadata.modified() {
                         if latest.is_none() || modified > latest.as_ref().unwrap().0 {

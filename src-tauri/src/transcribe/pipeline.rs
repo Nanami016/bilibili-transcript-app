@@ -25,6 +25,8 @@ pub async fn transcribe_video(
     cid: i64,
     cookie: &str,
     config: &AppConfig,
+    whisper_prompt_override: Option<&str>,
+    language: Option<&str>,
 ) -> Result<TranscriptResult> {
     log::info!("开始转录: bvid={}, cid={}", bvid, cid);
 
@@ -61,11 +63,18 @@ pub async fn transcribe_video(
     let audio_path = audio::extract_audio(url, &output_dir, cookie).await?;
     log::info!("音频下载完成: {:?}", audio_path);
 
-    // 创建 Whisper 客户端
+    // 创建 Whisper 客户端（优先使用按次传入的 prompt）
+    let whisper_prompt = whisper_prompt_override
+        .filter(|p| !p.is_empty())
+        .map(|p| p.to_string())
+        .or_else(|| if config.whisper.prompt.is_empty() { None } else { Some(config.whisper.prompt.clone()) });
+    let whisper_lang = language.filter(|l| !l.is_empty()).map(|l| l.to_string());
     let whisper_client = OpenAIWhisperClient::new(
         config.whisper.api_url.clone(),
         config.whisper.api_key.clone(),
         config.whisper.model.clone(),
+        whisper_prompt,
+        whisper_lang,
     );
 
     // 调用 Whisper API

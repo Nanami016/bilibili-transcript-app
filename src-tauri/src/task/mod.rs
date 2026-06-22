@@ -167,6 +167,10 @@ impl TaskManager {
         &self,
         app: AppHandle,
         url: String,
+        language: Option<String>,
+        whisper_prompt: Option<String>,
+        ai_prompt: Option<String>,
+        ai_context: Option<String>,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
         let task_id = task::insert_task(db.conn(), "transcribe", &url, "", "")
@@ -222,22 +226,31 @@ impl TaskManager {
                 eta: "正在转录...".to_string(),
             });
 
+            // 记录转录开始时间
+            let transcribe_start = std::time::Instant::now();
+
             // 执行转录
+            let wp = whisper_prompt.as_deref();
+            let lang = language.as_deref();
             match crate::transcribe::pipeline::transcribe_video(
-                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config,
+                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config, wp, lang,
             ).await {
                 Ok(result) => {
+                    // 计算转录耗时
+                    let elapsed = transcribe_start.elapsed();
+                    let duration_label = Self::format_elapsed(elapsed);
+
                     // 存储到数据库
                     let db = Database::open().ok();
                     if let Some(db) = db {
-                        let duration_str = format!("{}:{:02}", video_info.duration / 60, video_info.duration % 60);
+                        let video_duration = format!("{}:{:02}", video_info.duration / 60, video_info.duration % 60);
                         let record = crate::storage::database::TranscriptRecord {
                             id: 0,
                             bvid: bvid.clone(),
                             url: url.clone(),
                             title: video_info.title.clone(),
                             author: video_info.author.clone(),
-                            duration: duration_str,
+                            duration: video_duration,
                             upload_date: video_info.upload_date.clone(),
                             transcript_source: result.source.clone(),
                             transcript_text: result.text.clone(),
@@ -260,7 +273,42 @@ impl TaskManager {
                         "ai" => "AI字幕",
                         _ => "Whisper",
                     };
-                    let _ = Self::mark_completed(&app_clone, task_id, "transcribe", &video_info.title, None, Some(source_label));
+                    let file_info = format!("{} · 耗时{}", source_label, duration_label);
+                    let _ = Self::mark_completed(&app_clone, task_id, "transcribe", &video_info.title, None, Some(&file_info));
+
+                    // 如果启用了 AI 摘要，自动触发
+                    if config.ai_summary.enabled {
+                        let _ = app_clone.emit("task-progress", task::TaskProgressEvent {
+                            task_id,
+                            task_type: "transcribe".to_string(),
+                            status: "running".to_string(),
+                            progress: 80.0,
+                            speed: String::new(),
+                            eta: "正在生成AI摘要...".to_string(),
+                        });
+
+                        let ap = ai_prompt.as_deref();
+                        let ac = ai_context.as_deref();
+                        match Self::run_ai_summary(&bvid, &config, ap, ac).await {
+                            Ok(summary) => {
+                                let db = Database::open().ok();
+                                if let Some(db) = db {
+                                    let _ = db.update_summary(&bvid, &summary);
+                                    // 重新渲染 TXT（包含摘要）
+                                    if let Ok(Some(record)) = db.get_by_bvid(&bvid) {
+                                        let output_dir = std::path::PathBuf::from(
+                                            shellexpand::tilde(&config.bilibili.transcript_dir).to_string()
+                                        );
+                                        let _ = crate::storage::file::render_txt(&record, &output_dir);
+                                    }
+                                }
+                                log::info!("AI 摘要生成成功: bvid={}", bvid);
+                            }
+                            Err(e) => {
+                                log::warn!("AI 摘要生成失败（不影响转录结果）: {}", e);
+                            }
+                        }
+                    }
                 }
                 Err(e) => {
                     let _ = Self::mark_failed(&app_clone, task_id, "transcribe", &e.to_string());
@@ -342,6 +390,8 @@ impl TaskManager {
             }
 
             let api_key = config.ai_summary.api_key.unwrap_or_default();
+            let prompt = if config.ai_summary.prompt.is_empty() { None } else { Some(config.ai_summary.prompt.as_str()) };
+            let context = if config.ai_summary.context.is_empty() { None } else { Some(config.ai_summary.context.as_str()) };
 
             match crate::summary::openai::generate_summary(
                 &record.title,
@@ -349,6 +399,8 @@ impl TaskManager {
                 &config.ai_summary.api_url,
                 &api_key,
                 &config.ai_summary.model,
+                prompt,
+                context,
             ).await {
                 Ok(summary) => {
                     // 更新数据库
@@ -431,6 +483,47 @@ impl TaskManager {
         });
 
         Ok(())
+    }
+
+    /// 格式化耗时
+    fn format_elapsed(elapsed: std::time::Duration) -> String {
+        let secs = elapsed.as_secs();
+        if secs >= 60 {
+            format!("{}分{}秒", secs / 60, secs % 60)
+        } else {
+            format!("{}秒", secs)
+        }
+    }
+
+    /// 执行 AI 摘要（内部辅助方法）
+    async fn run_ai_summary(bvid: &str, config: &crate::config::AppConfig, ai_prompt: Option<&str>, ai_context: Option<&str>) -> Result<String, String> {
+        let api_key = config.ai_summary.api_key.as_deref()
+            .filter(|k| !k.is_empty())
+            .ok_or("未配置 AI 摘要 API Key")?;
+
+        let db = Database::open().map_err(|e| e.to_string())?;
+        let record = db.get_by_bvid(bvid)
+            .map_err(|e| e.to_string())?
+            .ok_or("未找到转录记录")?;
+
+        let prompt = ai_prompt
+            .filter(|p| !p.is_empty())
+            .or(if config.ai_summary.prompt.is_empty() { None } else { Some(config.ai_summary.prompt.as_str()) });
+        let context = ai_context
+            .filter(|c| !c.is_empty())
+            .or(if config.ai_summary.context.is_empty() { None } else { Some(config.ai_summary.context.as_str()) });
+
+        crate::summary::openai::generate_summary(
+            &record.title,
+            &record.transcript_text,
+            &config.ai_summary.api_url,
+            api_key,
+            &config.ai_summary.model,
+            prompt,
+            context,
+        )
+        .await
+        .map_err(|e| e.to_string())
     }
 
     /// 格式化文件大小

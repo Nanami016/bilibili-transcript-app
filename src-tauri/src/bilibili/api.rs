@@ -134,14 +134,24 @@ pub async fn get_favorites(cookie: &str) -> Result<Vec<FavoriteFolder>> {
     Ok(folders)
 }
 
-/// 获取收藏夹中的视频列表
-pub async fn get_favorite_videos(media_id: i64, cookie: &str) -> Result<Vec<VideoInfo>> {
-    log::info!("获取收藏夹视频列表: media_id={}", media_id);
+/// 收藏夹视频分页结果
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct FavoritePage {
+    pub videos: Vec<VideoInfo>,
+    pub has_more: bool,
+    pub page: i64,
+}
+
+/// 获取收藏夹中的视频列表（分页）
+pub async fn get_favorite_videos(media_id: i64, page: i64, cookie: &str) -> Result<FavoritePage> {
+    log::info!("获取收藏夹视频列表: media_id={}, page={}", media_id, page);
     let url = format!(
-        "https://api.bilibili.com/x/v3/fav/resource/list?media_id={}&ps=20&pn=1",
-        media_id
+        "https://api.bilibili.com/x/v3/fav/resource/list?media_id={}&ps=20&pn={}",
+        media_id, page
     );
     let data = bili_get(&url, cookie).await?;
+
+    let has_more = data["data"]["has_more"].as_bool().unwrap_or(false);
 
     let mut videos = Vec::new();
     if let Some(medias) = data["data"]["medias"].as_array() {
@@ -170,8 +180,8 @@ pub async fn get_favorite_videos(media_id: i64, cookie: &str) -> Result<Vec<Vide
         }
     }
 
-    log::info!("收藏夹视频列表获取成功: {} 个视频", videos.len());
-    Ok(videos)
+    log::info!("收藏夹视频列表获取成功: {} 个视频, has_more={}", videos.len(), has_more);
+    Ok(FavoritePage { videos, has_more, page })
 }
 
 /// 将 Cookie 字符串写入 Netscape 格式的 cookie 文件

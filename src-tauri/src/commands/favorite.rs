@@ -3,7 +3,8 @@
 use tauri::command;
 
 use crate::bilibili;
-use crate::bilibili::types::{FavoriteFolder, VideoInfo};
+use crate::bilibili::api::FavoritePage;
+use crate::bilibili::types::FavoriteFolder;
 
 /// 获取收藏夹列表
 #[command]
@@ -19,9 +20,9 @@ pub async fn get_favorites() -> Result<Vec<FavoriteFolder>, String> {
         .map_err(|e| e.to_string())
 }
 
-/// 获取收藏夹中的视频列表
+/// 获取收藏夹中的视频列表（分页）
 #[command]
-pub async fn get_favorite_videos(media_id: String) -> Result<Vec<VideoInfo>, String> {
+pub async fn get_favorite_videos(media_id: String, page: Option<i64>) -> Result<FavoritePage, String> {
     let config = crate::config::storage::load_config().map_err(|e| e.to_string())?;
 
     if config.bilibili.cookie.is_empty() {
@@ -29,8 +30,9 @@ pub async fn get_favorite_videos(media_id: String) -> Result<Vec<VideoInfo>, Str
     }
 
     let mid: i64 = media_id.parse().map_err(|_| "无效的收藏夹 ID".to_string())?;
+    let pn = page.unwrap_or(1);
 
-    bilibili::api::get_favorite_videos(mid, &config.bilibili.cookie)
+    bilibili::api::get_favorite_videos(mid, pn, &config.bilibili.cookie)
         .await
         .map_err(|e| e.to_string())
 }

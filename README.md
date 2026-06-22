@@ -8,15 +8,15 @@ B站视频转录 macOS 原生应用 — 支持视频下载、音频提取、Whis
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 🎬 视频下载 | ✅ 已测试 | 支持多种分辨率/格式选择 |
+| 🎬 视频下载 | ✅ 已测试 | 支持多种分辨率/格式选择，自动清理格式 ID 后缀 |
 | 🎵 音频下载 | ✅ 已测试 | yt-dlp 提取 + ffmpeg 转码 |
 | 📺 视频解析 | ✅ 已测试 | B站链接解析、封面获取、视频信息展示 |
-| 📁 收藏夹 | ✅ 已测试 | 浏览收藏夹、下载视频/音频、语音转录、AI 摘要 |
-| 📜 历史记录 | ✅ 已测试 | 下载/转录/AI 分析的历史记录 |
+| 📁 收藏夹 | ✅ 已测试 | 浏览收藏夹、分页加载、下载视频/音频、语音转录 |
+| 📜 历史记录 | ✅ 已测试 | 下载/转录的历史记录，转录显示耗时 |
 | 📋 任务中心 | ✅ 已测试 | 实时进度追踪、历史记录、任务管理 |
 | ⚙️ 设置 | ✅ 已测试 | Cookie 导入（浏览器/手动）、输出目录配置 |
-| 🎤 语音转文字 | ⚠️ 未充分测试 | Whisper 支持（OpenAI API / 本地 REST API） |
-| 🤖 AI 摘要 | ⚠️ 未充分测试 | 可选，支持 OpenAI 兼容 API |
+| 🎤 语音转文字 | ✅ 已测试 | Whisper 支持（OpenAI API / 本地 REST API），转录弹窗支持语言选择和提示词 |
+| 🤖 AI 摘要 | ⚠️ 未充分测试 | 集成到转录流程，转录后自动触发（可选），支持自定义指令和上下文 |
 
 ## 安装
 
@@ -61,15 +61,19 @@ npm run tauri build
 
 在首页输入 B站视频链接，选择分辨率后下载。音频会自动通过 ffmpeg 转码为 MP3。
 
-### 3. 语音转文字（可选）
+### 3. 语音转文字
 
 在设置页配置 Whisper API：
 - **远程模式**：填入 OpenAI API Key
-- **本地模式**：填入本地 Whisper 服务地址（如 whisper.cpp）
+- **本地模式**：填入本地 Whisper 服务地址（如 whisper.cpp），无需 API Key
 
-### 4. AI 摘要（可选）
+点击「语音转录」时弹出配置弹窗：
+- **视频语言**：中文/日文/英文/韩文/法文/德文/俄文/西班牙文
+- **转录提示词**（可选）：提高特定词汇的识别准确度
+- **AI 摘要指令**（可选）：自定义摘要风格
+- **上下文文本**（可选）：为 AI 提供额外背景信息
 
-在设置页启用 AI 摘要，配置 OpenAI 兼容 API 即可对转录文本生成摘要。
+转录完成后，如已启用 AI 摘要，会自动调用 AI 生成摘要（失败不影响转录结果）。
 
 ## 输出目录
 
@@ -79,8 +83,7 @@ npm run tauri build
 ~/Downloads/bilibili-transcript-app/
 ├── bilibili-video/          # 视频文件
 ├── bilibili-audio/          # 音频文件
-├── bilibili-transfer/       # 转录结果
-└── bilibili-ai-analysis/    # AI 分析结果
+└── bilibili-transfer/       # 转录结果（含 AI 摘要）
 ```
 
 ---
@@ -95,16 +98,16 @@ bilibili-transcript-app/
 │   │   ├── Sidebar.tsx           #   左侧导航
 │   │   ├── TaskPanel.tsx         #   任务面板
 │   │   ├── VideoCard.tsx         #   视频信息卡片
+│   │   ├── TranscribeModal.tsx   #   转录配置弹窗（语言/提示词/AI指令）
 │   │   └── common/               #   通用组件（Button, Spinner, Toast）
 │   ├── pages/                    # 页面
 │   │   ├── Home.tsx              #   首页
 │   │   ├── VideoDownload.tsx     #   视频下载
 │   │   ├── AudioDownload.tsx     #   音频下载
-│   │   ├── AudioTranscribe.tsx   #   语音转文字
-│   │   ├── AIAnalysis.tsx        #   AI 分析
-│   │   ├── Favorite.tsx          #   收藏夹
+│   │   ├── AudioTranscribe.tsx   #   语音转文字（含 AI 摘要）
+│   │   ├── Favorite.tsx          #   收藏夹（分页加载）
 │   │   ├── Settings.tsx          #   设置
-│   │   └── Logs.tsx              #   任务历史记录
+│   │   └── Logs.tsx              #   运行日志
 │   └── lib/tauri.ts              # Tauri API 封装
 │
 ├── src-tauri/                    # 后端（Rust + Tauri v2）

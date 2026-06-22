@@ -17,14 +17,18 @@ pub struct OpenAIWhisperClient {
     pub api_url: String,
     pub api_key: Option<String>,
     pub model: String,
+    pub prompt: Option<String>,
+    pub language: Option<String>,
 }
 
 impl OpenAIWhisperClient {
-    pub fn new(api_url: String, api_key: Option<String>, model: String) -> Self {
+    pub fn new(api_url: String, api_key: Option<String>, model: String, prompt: Option<String>, language: Option<String>) -> Self {
         Self {
             api_url,
             api_key,
             model,
+            prompt,
+            language,
         }
     }
 }
@@ -60,9 +64,21 @@ impl WhisperClient for OpenAIWhisperClient {
             .file_name(filename.to_string())
             .mime_str(mime)?;
 
-        let form = reqwest::multipart::Form::new()
+        let mut form = reqwest::multipart::Form::new()
             .part("file", file_part)
             .text("model", self.model.clone());
+
+        if let Some(ref prompt) = self.prompt {
+            if !prompt.is_empty() {
+                form = form.text("prompt", prompt.clone());
+            }
+        }
+
+        if let Some(ref lang) = self.language {
+            if !lang.is_empty() {
+                form = form.text("language", lang.clone());
+            }
+        }
 
         let mut request = client.post(&self.api_url).multipart(form);
 

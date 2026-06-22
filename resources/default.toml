@@ -6,6 +6,7 @@ mode = "openai"
 api_url = "https://api.openai.com/v1/audio/transcriptions"
 api_key = ""
 model = "whisper-1"
+prompt = ""  # 可选：转录提示词，提高识别准确性（如 "AI" 避免被识别为 "诶爱"）
 
 [bilibili]
 cookie = ""
@@ -15,6 +16,8 @@ transcript_dir = "~/Downloads/bilibili-download/transcript"
 
 [ai_summary]
 enabled = false
-api_url = "https://api.openai.com/v1/chat/completions"
+api_url = "https://api.openai.com/v1"  # 填写 base URL，自动追加 /chat/completions
 api_key = ""
 model = "gpt-4o-mini"
+prompt = ""    # 可选：自定义摘要指令（追加到默认 system prompt 之后）
+context = ""   # 可选：上下文文本（如频道简介、系列背景等）

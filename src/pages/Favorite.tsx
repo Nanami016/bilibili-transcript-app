@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
+import TranscribeModal from "../components/TranscribeModal";
+import type { TranscribeParams } from "../components/TranscribeModal";
 import {
   getFavorites,
   getFavoriteVideos,
-  transcribe,
   fetchCover,
   startVideoDownload,
   startAudioDownload,
-  startAiSummary,
+  startTranscribe,
 } from "../lib/tauri";
 
 interface FavoriteFolder {
@@ -34,7 +35,12 @@ function Favorite() {
   const [selectedFolder, setSelectedFolder] = useState<FavoriteFolder | null>(null);
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const [showTranscribeModal, setShowTranscribeModal] = useState(false);
+  const [transcribeTarget, setTranscribeTarget] = useState<VideoInfo | null>(null);
 
   // Toast 自动消失
   useEffect(() => {
@@ -65,13 +71,15 @@ function Favorite() {
     setSelectedFolder(folder);
     setVideosLoading(true);
     setVideos([]);
+    setPage(1);
+    setHasMore(false);
     try {
-      const result = await getFavoriteVideos(String(folder.id));
-      const videosData = result as VideoInfo[];
+      const result = await getFavoriteVideos(String(folder.id), 1);
+      const data = result as { videos: VideoInfo[]; has_more: boolean; page: number };
 
       // 通过 Rust 代理获取封面（避免 WebView 外部图片限制）
       const videosWithCovers = await Promise.all(
-        videosData.map(async (video) => {
+        data.videos.map(async (video) => {
           try {
             const coverData = await fetchCover(video.cover_url);
             return { ...video, cover_url: coverData as string };
@@ -83,6 +91,7 @@ function Favorite() {
       );
 
       setVideos(videosWithCovers);
+      setHasMore(data.has_more);
     } catch (err) {
       setToast({ message: `获取视频列表失败: ${err}`, type: "error" });
     } finally {
@@ -90,18 +99,59 @@ function Favorite() {
     }
   };
 
+  const handleLoadMore = async () => {
+    if (!selectedFolder || loadingMore) return;
+    const nextPage = page + 1;
+    setLoadingMore(true);
+    try {
+      const result = await getFavoriteVideos(String(selectedFolder.id), nextPage);
+      const data = result as { videos: VideoInfo[]; has_more: boolean; page: number };
+
+      const videosWithCovers = await Promise.all(
+        data.videos.map(async (video) => {
+          try {
+            const coverData = await fetchCover(video.cover_url);
+            return { ...video, cover_url: coverData as string };
+          } catch (e) {
+            console.error("封面获取失败:", video.title, e);
+            return video;
+          }
+        })
+      );
+
+      setVideos((prev) => [...prev, ...videosWithCovers]);
+      setPage(nextPage);
+      setHasMore(data.has_more);
+    } catch (err) {
+      setToast({ message: `加载更多失败: ${err}`, type: "error" });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const handleBack = () => {
     setSelectedFolder(null);
     setVideos([]);
+    setPage(1);
+    setHasMore(false);
   };
 
-  const handleTranscribe = async (video: VideoInfo) => {
+  const handleTranscribe = (video: VideoInfo) => {
+    setTranscribeTarget(video);
+    setShowTranscribeModal(true);
+  };
+
+  const handleTranscribeConfirm = async (params: TranscribeParams) => {
+    if (!transcribeTarget) return;
+    setShowTranscribeModal(false);
     try {
-      const url = `https://www.bilibili.com/video/${video.bvid}`;
-      await transcribe(url);
-      setToast({ message: `「${video.title}」转录完成`, type: "success" });
+      const url = `https://www.bilibili.com/video/${transcribeTarget.bvid}`;
+      await startTranscribe(url, params.language, params.whisperPrompt, params.aiPrompt, params.aiContext);
+      setToast({ message: `「${transcribeTarget.title}」转录任务已启动`, type: "info" });
     } catch (err) {
       setToast({ message: `转录失败: ${err}`, type: "error" });
+    } finally {
+      setTranscribeTarget(null);
     }
   };
 
@@ -125,15 +175,6 @@ function Favorite() {
     }
   };
 
-  const handleSummarize = async (video: VideoInfo) => {
-    try {
-      await startAiSummary(video.bvid);
-      setToast({ message: `「${video.title}」AI 摘要任务已启动`, type: "info" });
-    } catch (err) {
-      setToast({ message: `AI 摘要失败: ${err}`, type: "error" });
-    }
-  };
-
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -148,6 +189,13 @@ function Favorite() {
           <button className="toast-close" onClick={() => setToast(null)}>×</button>
         </div>
       )}
+
+      <TranscribeModal
+        visible={showTranscribeModal}
+        videoTitle={transcribeTarget?.title || ""}
+        onConfirm={handleTranscribeConfirm}
+        onCancel={() => { setShowTranscribeModal(false); setTranscribeTarget(null); }}
+      />
 
       {selectedFolder ? (
         <>
@@ -210,17 +258,26 @@ function Favorite() {
                     >
                       语音转录
                     </button>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px" }}
-                      onClick={() => handleSummarize(video)}
-                      title="AI 摘要"
-                    >
-                      AI 摘要
-                    </button>
                   </div>
                 </div>
               ))}
+              {hasMore && (
+                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    style={{ minWidth: 120 }}
+                  >
+                    {loadingMore ? "加载中..." : "加载更多"}
+                  </button>
+                </div>
+              )}
+              {!hasMore && videos.length > 0 && (
+                <div style={{ textAlign: "center", padding: "12px 0", color: "#999", fontSize: 13 }}>
+                  已加载全部 {videos.length} 个视频
+                </div>
+              )}
             </div>
           )}
         </>

@@ -17,6 +17,8 @@ pub struct WhisperConfig {
     pub api_url: String,
     pub api_key: Option<String>,
     pub model: String,
+    #[serde(default)]
+    pub prompt: String,
 }
 
 /// B站配置
@@ -44,6 +46,10 @@ pub struct AiSummaryConfig {
     pub api_url: String,
     pub api_key: Option<String>,
     pub model: String,
+    #[serde(default)]
+    pub prompt: String,
+    #[serde(default)]
+    pub context: String,
 }
 
 impl Default for AppConfig {
@@ -54,6 +60,7 @@ impl Default for AppConfig {
                 api_url: "https://api.openai.com/v1/audio/transcriptions".to_string(),
                 api_key: None,
                 model: "whisper-1".to_string(),
+                prompt: String::new(),
             },
             bilibili: BilibiliConfig {
                 cookie: String::new(),
@@ -65,9 +72,11 @@ impl Default for AppConfig {
             },
             ai_summary: AiSummaryConfig {
                 enabled: false,
-                api_url: "https://api.openai.com/v1/chat/completions".to_string(),
+                api_url: "https://api.openai.com/v1".to_string(),
                 api_key: None,
                 model: "gpt-4o-mini".to_string(),
+                prompt: String::new(),
+                context: String::new(),
             },
         }
     }
