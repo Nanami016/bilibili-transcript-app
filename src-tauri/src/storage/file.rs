@@ -8,11 +8,7 @@ use super::database::TranscriptRecord;
 
 /// 渲染 TXT 文件
 pub fn render_txt(record: &TranscriptRecord, output_dir: &Path) -> Result<PathBuf> {
-    // 按发布年月组织目录
-    let year = &record.upload_date[..4.min(record.upload_date.len())];
-    let month = &record.upload_date[5..7.min(record.upload_date.len())];
-    let dir = output_dir.join(year).join(month);
-    std::fs::create_dir_all(&dir)?;
+    std::fs::create_dir_all(output_dir)?;
 
     // 生成文件名
     let filename = format!(
@@ -22,7 +18,7 @@ pub fn render_txt(record: &TranscriptRecord, output_dir: &Path) -> Result<PathBu
         record.upload_date,
         record.bvid
     );
-    let filepath = dir.join(filename);
+    let filepath = output_dir.join(filename);
 
     // 渲染内容
     let summary = record.summary.as_deref().unwrap_or("【AI待处理：请阅读全文后，替换此行，写结构化摘要】");

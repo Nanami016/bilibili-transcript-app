@@ -8,7 +8,6 @@ import {
   startVideoDownload,
   startAudioDownload,
   startTranscribe,
-  startAiSummary,
 } from "../lib/tauri";
 
 interface VideoInfo {
@@ -126,19 +125,6 @@ function Home() {
     }
   };
 
-  const handleSummarize = async () => {
-    if (!videoInfo) return;
-    setActionLoading("aiSummary");
-    try {
-      await startAiSummary(videoInfo.bvid);
-      setToast({ message: "AI 摘要任务已启动", type: "info" });
-    } catch (err) {
-      setToast({ message: `启动失败: ${err}`, type: "error" });
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -176,7 +162,6 @@ function Home() {
               onDownloadVideo={handleDownloadVideo}
               onDownloadAudio={handleDownloadAudio}
               onTranscribe={handleTranscribe}
-              onSummarize={handleSummarize}
             />
 
             {actionLoading && (
@@ -185,8 +170,6 @@ function Home() {
                   ? "正在启动转录任务..."
                   : actionLoading === "downloadVideo"
                   ? "正在启动视频下载..."
-                  : actionLoading === "aiSummary"
-                  ? "正在启动 AI 分析..."
                   : "正在启动音频下载..."}
               </div>
             )}

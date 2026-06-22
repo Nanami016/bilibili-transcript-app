@@ -7,9 +7,9 @@
 将 bilibili-auto-transcript（Claude Code skill）改造为 macOS 原生应用，实现：
 - B站视频下载和音频提取
 - 字幕获取（CC → AI 降级）
-- Whisper 语音转文字（支持远程 API 和本地 REST API）
-- AI 摘要生成（可选）
-- 收藏夹管理和批量转录
+- Whisper 语音转文字（支持远程 API 和本地 REST API，本地模式无需 API Key）
+- AI 摘要生成（可选，转录完成后自动触发）
+- 收藏夹管理和批量转录（支持分页加载）
 
 ### 1.2 技术选型
 
@@ -131,9 +131,9 @@ bilibili-transcript-app/
 
 ```toml
 [whisper]
-mode = "openai"              # "openai" | "local"
-api_url = "https://api.openai.com/v1/audio/transcriptions"
-api_key = "sk-xxx"           # 可选，本地模式可留空
+mode = "local"               # "openai" 需要 api_key | "local" 无需 api_key
+api_url = "http://localhost:8080/v1/audio/transcriptions"  # 本地或远程地址
+api_key = ""                 # openai 模式必填，local 模式留空
 model = "whisper-1"
 
 [bilibili]
@@ -162,7 +162,7 @@ model = "gpt-4o-mini"
 | API | 端点 | 说明 |
 |-----|------|------|
 | 收藏夹列表 | `GET /x/v3/fav/folder/created?up_mid={uid}` | 获取用户所有收藏夹 |
-| 收藏夹内容 | `GET /x/v3/fav/resource/list?media_id={fid}&ps=20&pn=1` | 获取收藏夹中的视频 |
+| 收藏夹内容 | `GET /x/v3/fav/resource/list?media_id={fid}&ps=20&pn={page}` | 获取收藏夹中的视频（分页） |
 | 视频信息 | `GET /x/web-interface/view?bvid={bvid}` | 获取视频详细信息 |
 | 字幕列表 | `GET /x/player/v2?bvid={bvid}&cid={cid}` | 获取视频字幕列表 |
 
@@ -259,18 +259,13 @@ CREATE TABLE transcripts (
 );
 ```
 
-**TXT 文件渲染** (`~/bilibili-voice-only/`):
+**TXT 文件渲染** — 直接输出到 `transcript_dir`，不创建子目录：
 
 ```
-~/bilibili-voice-only/
-├── 2024/
-│   ├── 01/
-│   │   ├── 视频标题_UP主名_2024-01-15_BVxxx.txt
-│   │   └── ...
-│   └── 06/
-│       └── ...
-└── 2025/
-    └── ...
+~/Downloads/bilibili-transcript-app/bilibili-transfer/
+├── 视频标题_UP主名_2024-01-15_BVxxx.txt
+├── 另一个视频_另一位UP主_2024-06-20_BVyyy.txt
+└── ...
 ```
 
 ### 3.6 Tauri 命令 (`commands/`)
@@ -303,7 +298,8 @@ async fn test_whisper_connection() -> Result<bool, String>;
 async fn get_favorites() -> Result<Vec<FavoriteFolder>, String>;
 
 #[tauri::command]
-async fn get_favorite_videos(media_id: String) -> Result<Vec<VideoInfo>, String>;
+async fn get_favorite_videos(media_id: String, page: Option<i64>) -> Result<FavoritePage, String>;
+// FavoritePage { videos: Vec<VideoInfo>, has_more: bool, page: i64 }
 
 // 配置相关
 #[tauri::command]
@@ -395,8 +391,8 @@ brew install yt-dlp ffmpeg
 │  ─────── │ │  视频封面                                     │ │
 │  任务中心 │ │  视频标题                                     │ │
 │  视频下载 │ │  UP主 | 时长                                  │ │
-│  音频下载 │ │  [下载视频] [下载音频] [语音转录] [AI摘要]     │ │
-│  AI分析   │ └──────────────────────────────────────────────┘ │
+│  音频下载 │ │  [下载视频] [下载音频] [语音转录]              │ │
+│  音频转录 │ └──────────────────────────────────────────────┘ │
 │  音频转录 │                                                  │
 │  ─────── │                                                  │
 │  运行日志 │                                                  │
@@ -439,13 +435,12 @@ brew install yt-dlp ffmpeg
 | 页面 | 功能 |
 |------|------|
 | **首页** | 输入视频链接、解析视频信息（含封面）、执行操作 |
-| **收藏夹** | 显示收藏夹列表、收藏夹视频列表 |
+| **收藏夹** | 显示收藏夹列表、收藏夹视频列表（支持分页加载） |
 | **视频下载** | 视频下载任务的实时进度 + 历史记录 |
 | **音频下载** | 音频下载任务的实时进度 + 历史记录 |
-| **AI 分析** | AI 摘要生成任务的实时进度 + 历史记录 |
-| **音频转录** | 语音转录任务的实时进度 + 历史记录 |
+| **音频转录** | 语音转录任务的实时进度 + 历史记录（含转录耗时，AI 摘要自动触发） |
 | **运行日志** | 查看 DEBUG 级别运行日志，支持筛选/清空/自动滚动 |
-| **设置** | B站 Cookie（浏览器读取/手动导入）、Whisper 配置、AI 摘要、三路径配置 |
+| **设置** | B站 Cookie（浏览器读取/手动导入）、Whisper 配置、AI 摘要、路径配置 |
 
 ### 5.4 视频卡片功能
 
@@ -453,8 +448,7 @@ brew install yt-dlp ffmpeg
 |------|------|------|
 | 下载视频 | 弹出分辨率选择下拉框 | 调用 yt-dlp 下载 |
 | 下载音频 | 直接下载音频文件 | 调用 yt-dlp -x |
-| 语音转录 | 执行三级降级转录 | CC → AI → Whisper |
-| AI 摘要 | 生成视频摘要 | 调用 OpenAI 兼容 API |
+| 语音转录 | 执行三级降级转录 + 自动 AI 摘要 | CC → AI → Whisper，转录后自动触发 AI 摘要（如已启用） |
 
 ---
 
@@ -482,12 +476,9 @@ brew install yt-dlp ffmpeg
 │   └── 视频标题.mp4
 ├── bilibili-audio/             # 音频下载目录
 │   └── 视频标题.mp3
-├── bilibili-transfer/          # 转录结果目录
-│   └── 2024/
-│       └── 01/
-│           └── 视频标题_UP主名_2024-01-15_BVxxx.txt
-└── bilibili-ai-analysis/       # AI 分析结果目录
-    └── ...
+├── bilibili-transfer/          # 转录结果目录（直接存放，无子目录）
+│   └── 视频标题_UP主名_2024-01-15_BVxxx.txt
+└── bilibili-ai-analysis/       # AI 分析结果目录（保留，暂未使用）
 ```
 
 ---
@@ -528,12 +519,12 @@ brew install yt-dlp ffmpeg
 - [x] 实现 AI 摘要生成（OpenAI 兼容 API）
 - [x] 实现 SQLite 数据库（创建表、CRUD 操作）
 - [x] 实现 TXT 文件渲染输出
-- [x] 实现按年月组织目录
+- [x] ~~实现按年月组织目录~~ 改为直接输出到目标目录
 
 ### Phase 6: 收藏夹功能 + 设置页面 ✅
 
 - [x] 实现收藏夹列表显示
-- [x] 实现收藏夹视频列表
+- [x] 实现收藏夹视频列表（支持分页加载）
 - [x] 收藏夹视频封面通过 Rust 代理加载（避免 WebView 外部图片限制）
 - [x] 收藏夹视频支持下载视频、下载音频、语音转录、AI 摘要四个功能
 - [x] 完善设置页面（Whisper、Cookie、AI 摘要、三路径配置）
@@ -570,6 +561,11 @@ brew install yt-dlp ffmpeg
 | 格式列表通过 yt-dlp 获取 | yt-dlp + Cookie 传递，普通用户最高 480P | B站限制：720P+ 需大会员 |
 | 输出路径 `~/Downloads/bilibili-download/` | `~/Downloads/bilibili-transcript-app/` 子目录 | 用户要求统一父目录 |
 | 无 AI 分析独立路径 | 新增 `ai_analysis_dir` 配置 | AI 分析结果需要独立存储 |
+| TXT 文件按年/月子目录组织 | 直接输出到 `transcript_dir` | 用户要求扁平结构 |
+| AI 分析为独立任务页面 | AI 分析合并到音频转录，转录后自动触发 | 用户要求简化流程 |
+| Whisper openai 模式必须有 API Key | `mode = "local"` 时无需 API Key | 支持本地 Whisper 服务 |
+| 收藏夹一次加载全部 | 分页加载（每页 20 个，"加载更多"按钮） | B站 API 限制，大数据量时性能更好 |
+| 下载文件名由 yt-dlp 决定 | 下载后自动清理格式 ID 后缀（如 `.f30033`） | yt-dlp 会在文件名中追加 B站格式 ID |
 
 ### 额外实现的功能（不在原计划中）
 
@@ -579,6 +575,11 @@ brew install yt-dlp ffmpeg
 - [x] **四路径配置** — 视频/音频/转录/AI分析独立输出目录
 - [x] **Toast 通知** — 自动消失 + 手动关闭
 - [x] **全局 TaskToast** — 右上角进度提示框，支持多任务同时显示
+- [x] **本地 Whisper 模式** — `mode = "local"` 时无需 API Key，支持本地 REST API
+- [x] **转录耗时追踪** — 任务历史显示转录耗时（如 "Whisper · 耗时37秒"）
+- [x] **收藏夹分页加载** — 每页 20 个视频，支持"加载更多"
+- [x] **下载文件名清理** — 自动去除 yt-dlp 添加的格式 ID 后缀（如 `.f30033`）
+- [x] **音频格式兼容** — `find_downloaded_file` 支持 mp3/m4a/wav/ogg/flac/aac/opus
 
 ---
 

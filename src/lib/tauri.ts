@@ -15,8 +15,8 @@ export const testWhisperConnection = () => invoke("test_whisper_connection");
 
 // 收藏夹相关
 export const getFavorites = () => invoke("get_favorites");
-export const getFavoriteVideos = (mediaId: string) =>
-  invoke("get_favorite_videos", { mediaId });
+export const getFavoriteVideos = (mediaId: string, page: number = 1) =>
+  invoke("get_favorite_videos", { mediaId, page });
 
 // 历史记录相关
 export const getTranscriptHistory = () => invoke("get_transcript_history");

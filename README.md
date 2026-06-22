@@ -8,15 +8,15 @@ B站视频转录 macOS 原生应用 — 支持视频下载、音频提取、Whis
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 🎬 视频下载 | ✅ 已测试 | 支持多种分辨率/格式选择 |
+| 🎬 视频下载 | ✅ 已测试 | 支持多种分辨率/格式选择，自动清理格式 ID 后缀 |
 | 🎵 音频下载 | ✅ 已测试 | yt-dlp 提取 + ffmpeg 转码 |
 | 📺 视频解析 | ✅ 已测试 | B站链接解析、封面获取、视频信息展示 |
-| 📁 收藏夹 | ✅ 已测试 | 浏览收藏夹、下载视频/音频、语音转录、AI 摘要 |
-| 📜 历史记录 | ✅ 已测试 | 下载/转录/AI 分析的历史记录 |
+| 📁 收藏夹 | ✅ 已测试 | 浏览收藏夹、分页加载、下载视频/音频、语音转录 |
+| 📜 历史记录 | ✅ 已测试 | 下载/转录的历史记录，转录显示耗时 |
 | 📋 任务中心 | ✅ 已测试 | 实时进度追踪、历史记录、任务管理 |
 | ⚙️ 设置 | ✅ 已测试 | Cookie 导入（浏览器/手动）、输出目录配置 |
-| 🎤 语音转文字 | ⚠️ 未充分测试 | Whisper 支持（OpenAI API / 本地 REST API） |
-| 🤖 AI 摘要 | ⚠️ 未充分测试 | 可选，支持 OpenAI 兼容 API |
+| 🎤 语音转文字 | ✅ 已测试 | Whisper 支持（OpenAI API / 本地 REST API），转录后自动触发 AI 摘要 |
+| 🤖 AI 摘要 | ⚠️ 未充分测试 | 可选，转录完成后自动调用 OpenAI 兼容 API |
 
 ## 安装
 
@@ -65,11 +65,13 @@ npm run tauri build
 
 在设置页配置 Whisper API：
 - **远程模式**：填入 OpenAI API Key
-- **本地模式**：填入本地 Whisper 服务地址（如 whisper.cpp）
+- **本地模式**：填入本地 Whisper 服务地址（如 whisper.cpp），无需 API Key
+
+转录完成后，如已启用 AI 摘要，会自动调用 AI 生成摘要（失败不影响转录结果）。
 
 ### 4. AI 摘要（可选）
 
-在设置页启用 AI 摘要，配置 OpenAI 兼容 API 即可对转录文本生成摘要。
+在设置页启用 AI 摘要，配置 OpenAI 兼容 API。启用后，转录完成会自动触发 AI 摘要生成。
 
 ## 输出目录
 
@@ -100,11 +102,10 @@ bilibili-transcript-app/
 │   │   ├── Home.tsx              #   首页
 │   │   ├── VideoDownload.tsx     #   视频下载
 │   │   ├── AudioDownload.tsx     #   音频下载
-│   │   ├── AudioTranscribe.tsx   #   语音转文字
-│   │   ├── AIAnalysis.tsx        #   AI 分析
-│   │   ├── Favorite.tsx          #   收藏夹
+│   │   ├── AudioTranscribe.tsx   #   语音转文字（含 AI 摘要）
+│   │   ├── Favorite.tsx          #   收藏夹（分页加载）
 │   │   ├── Settings.tsx          #   设置
-│   │   └── Logs.tsx              #   任务历史记录
+│   │   └── Logs.tsx              #   运行日志
 │   └── lib/tauri.ts              # Tauri API 封装
 │
 ├── src-tauri/                    # 后端（Rust + Tauri v2）

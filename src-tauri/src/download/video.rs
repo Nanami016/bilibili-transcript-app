@@ -90,8 +90,19 @@ pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf, co
     let filepath = parse_download_path(&stdout, output_dir)
         .unwrap_or_else(|| output_dir.join("download.mp4"));
 
-    log::info!("视频下载完成: {:?}", filepath);
-    Ok(filepath)
+    // 清理文件名中的格式 ID 后缀（如 .f30033）
+    let clean_path = clean_format_suffix(&filepath);
+    if clean_path != filepath {
+        if let Err(e) = std::fs::rename(&filepath, &clean_path) {
+            log::warn!("重命名文件失败（保留原文件名）: {}", e);
+        } else {
+            log::debug!("文件名已清理: {:?} -> {:?}", filepath, clean_path);
+        }
+    }
+
+    let result = if clean_path.exists() { clean_path } else { filepath };
+    log::info!("视频下载完成: {:?}", result);
+    Ok(result)
 }
 
 /// 获取视频可用格式列表
@@ -143,6 +154,29 @@ pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Val
 
     log::info!("格式列表获取成功: {} 个格式", formats.len());
     Ok(formats)
+}
+
+/// 清理文件名中的格式 ID 后缀（如 .f30033.mp4 -> .mp4）
+fn clean_format_suffix(path: &std::path::Path) -> PathBuf {
+    let filename = match path.file_stem().and_then(|n| n.to_str()) {
+        Some(f) => f,
+        None => return path.to_path_buf(),
+    };
+    let ext = match path.extension().and_then(|e| e.to_str()) {
+        Some(e) => e,
+        None => return path.to_path_buf(),
+    };
+
+    // 匹配 .f + 数字 的格式 ID 后缀（如 f30033, f30280）
+    let re = regex::Regex::new(r"\.f\d+$").unwrap();
+    if re.is_match(filename) {
+        let cleaned = re.replace(filename, "");
+        if let Some(parent) = path.parent() {
+            return parent.join(format!("{}.{}", cleaned, ext));
+        }
+    }
+
+    path.to_path_buf()
 }
 
 /// 从 yt-dlp 输出中解析下载的文件路径
