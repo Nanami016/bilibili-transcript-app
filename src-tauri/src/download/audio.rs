@@ -64,6 +64,8 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
         "-o".to_string(),
         mp3_str.to_string(),
         "--no-playlist".to_string(),
+        "--print".to_string(),
+        "after_move:filepath".to_string(),
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -164,6 +166,8 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
         "-o".to_string(),
         output_str.to_string(),
         "--no-playlist".to_string(),
+        "--print".to_string(),
+        "after_move:filepath".to_string(),
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -218,8 +222,20 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
 
 /// 从 yt-dlp 输出中查找下载的文件
 fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option<PathBuf> {
-    // 优先从 yt-dlp 输出的 Destination: 行获取路径
-    // 注意：yt-dlp -x 转换格式后，原始文件会被删除，Destination 路径可能已不存在
+    // 最高优先级：--print after_move:filepath 输出的最终文件路径
+    // --print 输出的是纯路径行（无 [download] 前缀），取最后一个有效路径
+    for line in output.lines().rev() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('[') && !trimmed.contains("Destination:") {
+            let p = PathBuf::from(trimmed);
+            if p.exists() {
+                log::debug!("从 --print 输出获取文件路径: {:?}", p);
+                return Some(p);
+            }
+        }
+    }
+
+    // 次优先级：从 yt-dlp 输出的 Destination: 行获取路径
     for line in output.lines() {
         if line.contains("Destination:") {
             if let Some(path) = line.split("Destination:").nth(1) {
@@ -227,13 +243,13 @@ fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option
                 if p.exists() {
                     return Some(p);
                 }
-                log::debug!("Destination 路径已不存在（可能已被格式转换删除）: {:?}", p);
+                log::debug!("Destination 路径已不存在: {:?}", p);
             }
         }
     }
 
-    // Fallback: 扫描目录中最近修改的音频文件
-    // 优先匹配目标格式，也接受其他常见音频格式（yt-dlp 可能未能转换）
+    // 最后 fallback：扫描目录中最近修改的音频文件
+    log::warn!("无法从 yt-dlp 输出获取文件路径，回退到目录扫描");
     let audio_exts = [ext, "m4a", "wav", "ogg", "flac", "aac", "opus"];
     let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
     if let Ok(entries) = std::fs::read_dir(output_dir) {
