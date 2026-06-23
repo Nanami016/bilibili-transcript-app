@@ -262,7 +262,7 @@ function Favorite() {
                 </div>
               ))}
               {hasMore && (
-                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "16px 0" }}>
                   <button
                     className="btn btn-secondary"
                     onClick={handleLoadMore}
@@ -274,7 +274,7 @@ function Favorite() {
                 </div>
               )}
               {!hasMore && videos.length > 0 && (
-                <div style={{ textAlign: "center", padding: "12px 0", color: "#999", fontSize: 13 }}>
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "12px 0", color: "#999", fontSize: 13 }}>
                   已加载全部 {videos.length} 个视频
                 </div>
               )}

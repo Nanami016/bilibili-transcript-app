@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection } from "../lib/tauri";
 
 function Settings() {
@@ -6,9 +6,11 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [cookieStatus, setCookieStatus] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [autoSaved, setAutoSaved] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [manualCookie, setManualCookie] = useState("");
   const [browserLoading, setBrowserLoading] = useState(false);
+  const skipAutoSaveRef = useRef(true);
 
   useEffect(() => { loadConfig(); }, []);
 
@@ -18,6 +20,25 @@ function Settings() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // 自动保存：config 变化后延迟 800ms 自动写入
+  useEffect(() => {
+    if (skipAutoSaveRef.current) {
+      skipAutoSaveRef.current = false;
+      return;
+    }
+    if (!config) return;
+    const timer = setTimeout(async () => {
+      try {
+        await updateConfig(config);
+        setAutoSaved(true);
+        setTimeout(() => setAutoSaved(false), 2000);
+      } catch (error) {
+        console.error("自动保存失败:", error);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [config]);
 
   const loadConfig = async () => {
     try {
@@ -237,8 +258,8 @@ function Settings() {
           {config?.whisper?.mode === "local" && (
             <p className="form-hint" style={{ marginTop: 4 }}>
               💡 本地 Whisper 服务部署可参考项目：
-              <a href="https://github.com/Nanami016/whisper-server" target="_blank" rel="noopener noreferrer" style={{ color: "#1890ff", marginLeft: 4 }}>
-                whisper-server
+              <a href="https://github.com/Nanami016/FunAudioLLM-Server" target="_blank" rel="noopener noreferrer" style={{ color: "#1890ff", marginLeft: 4 }}>
+                FunAudioLLM-Server
               </a>
             </p>
           )}
@@ -309,6 +330,9 @@ function Settings() {
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? "保存中..." : "💾 保存设置"}
         </button>
+        {autoSaved && (
+          <span style={{ fontSize: 13, color: "#52c41a", marginLeft: 12 }}>✅ 已自动保存</span>
+        )}
       </div>
     </div>
   );

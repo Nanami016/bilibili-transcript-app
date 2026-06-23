@@ -64,6 +64,8 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
         "-o".to_string(),
         mp3_str.to_string(),
         "--no-playlist".to_string(),
+        "--print".to_string(),
+        "after_move:filepath".to_string(),
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -110,31 +112,40 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
     let mp3_path = clean_format_suffix(&mp3_path);
     log::debug!("音频文件: {:?}", mp3_path);
 
-    // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
-    log::debug!("Step 2: ffmpeg 转换为 16kHz WAV");
+    // 如果文件已经是 WAV 格式，跳过转换
     let wav_path = mp3_path.with_extension("wav");
-    let ffmpeg_output = Command::new("ffmpeg")
-        .args([
-            "-y",
-            "-i",
-            &mp3_path.to_string_lossy(),
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            "-c:a",
-            "pcm_s16le",
-            &wav_path.to_string_lossy(),
-        ])
-        .output()?;
+    if mp3_path.extension().and_then(|e| e.to_str()) == Some("wav") {
+        log::debug!("音频已是 WAV 格式，跳过 ffmpeg 转换");
+        // 如果文件不在目标路径，复制一份
+        if mp3_path != wav_path {
+            std::fs::copy(&mp3_path, &wav_path)?;
+        }
+    } else {
+        // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
+        log::debug!("Step 2: ffmpeg 转换为 16kHz WAV");
+        let ffmpeg_output = Command::new("ffmpeg")
+            .args([
+                "-y",
+                "-i",
+                &mp3_path.to_string_lossy(),
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                "-c:a",
+                "pcm_s16le",
+                &wav_path.to_string_lossy(),
+            ])
+            .output()?;
 
-    if !ffmpeg_output.status.success() {
-        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
-        log::error!("ffmpeg 音频转换失败: {}", stderr);
-        bail!("ffmpeg 音频转换失败: {}", stderr);
+        if !ffmpeg_output.status.success() {
+            let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
+            log::error!("ffmpeg 音频转换失败: {}", stderr);
+            bail!("ffmpeg 音频转换失败: {}", stderr);
+        }
+
+        let _ = std::fs::remove_file(&mp3_path);
     }
-
-    let _ = std::fs::remove_file(&mp3_path);
 
     log::info!("音频提取完成: {:?}", wav_path);
     Ok(wav_path)
@@ -155,6 +166,8 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
         "-o".to_string(),
         output_str.to_string(),
         "--no-playlist".to_string(),
+        "--print".to_string(),
+        "after_move:filepath".to_string(),
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -209,8 +222,20 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
 
 /// 从 yt-dlp 输出中查找下载的文件
 fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option<PathBuf> {
-    // 优先从 yt-dlp 输出的 Destination: 行获取路径
-    // 注意：yt-dlp -x 转换格式后，原始文件会被删除，Destination 路径可能已不存在
+    // 最高优先级：--print after_move:filepath 输出的最终文件路径
+    // --print 输出的是纯路径行（无 [download] 前缀），取最后一个有效路径
+    for line in output.lines().rev() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('[') && !trimmed.contains("Destination:") {
+            let p = PathBuf::from(trimmed);
+            if p.exists() {
+                log::debug!("从 --print 输出获取文件路径: {:?}", p);
+                return Some(p);
+            }
+        }
+    }
+
+    // 次优先级：从 yt-dlp 输出的 Destination: 行获取路径
     for line in output.lines() {
         if line.contains("Destination:") {
             if let Some(path) = line.split("Destination:").nth(1) {
@@ -218,13 +243,13 @@ fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option
                 if p.exists() {
                     return Some(p);
                 }
-                log::debug!("Destination 路径已不存在（可能已被格式转换删除）: {:?}", p);
+                log::debug!("Destination 路径已不存在: {:?}", p);
             }
         }
     }
 
-    // Fallback: 扫描目录中最近修改的音频文件
-    // 优先匹配目标格式，也接受其他常见音频格式（yt-dlp 可能未能转换）
+    // 最后 fallback：扫描目录中最近修改的音频文件
+    log::warn!("无法从 yt-dlp 输出获取文件路径，回退到目录扫描");
     let audio_exts = [ext, "m4a", "wav", "ogg", "flac", "aac", "opus"];
     let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
     if let Ok(entries) = std::fs::read_dir(output_dir) {
