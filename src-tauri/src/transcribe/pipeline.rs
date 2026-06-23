@@ -15,10 +15,14 @@ pub struct TranscriptResult {
     pub language: Option<String>,
 }
 
+/// 进度回调: (progress: 0.0~100.0, speed: String, eta: String)
+pub type ProgressCallback = Box<dyn Fn(f64, String, String) + Send + 'static>;
+
 /// 执行转录流水线
 /// 1. 尝试获取 CC 字幕
 /// 2. 尝试获取 AI 字幕
 /// 3. 使用 Whisper 转录
+#[allow(clippy::too_many_arguments)]
 pub async fn transcribe_video(
     url: &str,
     bvid: &str,
@@ -27,6 +31,7 @@ pub async fn transcribe_video(
     config: &AppConfig,
     whisper_prompt_override: Option<&str>,
     language: Option<&str>,
+    on_progress: Option<ProgressCallback>,
 ) -> Result<TranscriptResult> {
     log::info!("开始转录: bvid={}, cid={}", bvid, cid);
 
@@ -60,7 +65,17 @@ pub async fn transcribe_video(
     );
 
     log::info!("正在下载音频...");
-    let audio_path = audio::extract_audio(url, &output_dir, cookie, None).await?;
+
+    // 构建进度回调，映射到 10%~80% 范围
+    let audio_progress: Option<audio::ProgressCallback> = on_progress.map(|cb| {
+        Box::new(move |pct: f64, speed: String, eta: String| {
+            // yt-dlp 下载进度 0~100% 映射到 10%~80%
+            let mapped = 10.0 + pct * 0.7;
+            cb(mapped, speed, eta);
+        }) as audio::ProgressCallback
+    });
+
+    let audio_path = audio::extract_audio(url, &output_dir, cookie, audio_progress).await?;
     log::info!("音频下载完成: {:?}", audio_path);
 
     // 创建 Whisper 客户端（优先使用按次传入的 prompt）

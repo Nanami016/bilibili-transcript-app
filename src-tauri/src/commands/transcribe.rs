@@ -31,6 +31,7 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
         &config,
         None,
         None,
+        None,
     )
     .await
     .map_err(|e| format!("转录失败: {}", e))?;
@@ -84,6 +85,24 @@ pub async fn test_whisper_connection() -> Result<bool, String> {
     crate::transcribe::whisper::WhisperClient::test_connection(&client)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 测试 AI 摘要 API 连接
+#[command]
+pub async fn test_ai_summary_connection() -> Result<bool, String> {
+    let config = crate::config::storage::load_config().map_err(|e| e.to_string())?;
+
+    let api_key = config.ai_summary.api_key
+        .filter(|k| !k.is_empty())
+        .ok_or("未配置 AI 摘要 API Key")?;
+
+    crate::summary::openai::test_connection(
+        &config.ai_summary.api_url,
+        &api_key,
+        &config.ai_summary.model,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// 格式化秒数为 HH:MM:SS

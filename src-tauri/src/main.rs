@@ -26,6 +26,13 @@ fn main() {
 
     log::info!("配置加载完成");
 
+    // 清理上次运行残留的 running 状态任务（标记为 failed）
+    if let Ok(db) = storage::database::Database::open() {
+        if let Err(e) = storage::task::cleanup_stale_tasks(db.conn()) {
+            log::warn!("清理残留任务失败: {}", e);
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(app_config)
@@ -38,6 +45,7 @@ fn main() {
             commands::video::fetch_cover,
             commands::transcribe::transcribe,
             commands::transcribe::test_whisper_connection,
+            commands::transcribe::test_ai_summary_connection,
             commands::favorite::get_favorites,
             commands::favorite::get_favorite_videos,
             commands::history::get_transcript_history,

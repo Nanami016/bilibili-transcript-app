@@ -17,6 +17,8 @@ B站视频转录 macOS 原生应用 — 支持视频下载、音频提取、Whis
 | ⚙️ 设置 | ✅ 已测试 | Cookie 导入（浏览器/手动）、输出目录配置、自动保存 |
 | 🎤 语音转文字 | ✅ 已测试 | Whisper 支持（OpenAI API / 本地 REST API），转录弹窗支持语言选择和提示词 |
 | 🤖 AI 摘要 | ✅ 已测试 | 集成到转录流程，转录后自动触发（可选），支持自定义指令和上下文 |
+| 🎨 深色模式 | ✅ 已测试 | 跟随系统/手动切换，B站粉主题 + 毛玻璃风格 UI |
+| 📊 实时进度 | ✅ 已测试 | 视频/音频下载实时进度条（百分比、速度、预计剩余时间） |
 
 ## 安装
 
@@ -94,19 +96,23 @@ npm run tauri build
 bilibili-transcript-app/
 ├── src/                          # 前端（React + TypeScript）
 │   ├── components/               # UI 组件
+│   │   ├── Layout.tsx            #   布局框架 + 主题初始化
 │   │   ├── InputBar.tsx          #   链接输入栏
 │   │   ├── Sidebar.tsx           #   左侧导航
 │   │   ├── TaskPanel.tsx         #   任务面板
+│   │   ├── TaskToast.tsx         #   右上角任务进度通知
 │   │   ├── VideoCard.tsx         #   视频信息卡片
 │   │   ├── TranscribeModal.tsx   #   转录配置弹窗（语言/提示词/AI指令）
+│   │   ├── LogViewer.tsx         #   设置页内嵌日志查看器
 │   │   └── common/               #   通用组件（Button, Spinner, Toast）
 │   ├── pages/                    # 页面
 │   │   ├── Home.tsx              #   首页
 │   │   ├── VideoDownload.tsx     #   视频下载
 │   │   ├── AudioDownload.tsx     #   音频下载
 │   │   ├── AudioTranscribe.tsx   #   语音转文字（含 AI 摘要）
+│   │   ├── AIAnalysis.tsx        #   AI 分析
 │   │   ├── Favorite.tsx          #   收藏夹（分页加载）
-│   │   ├── Settings.tsx          #   设置
+│   │   ├── Settings.tsx          #   设置（含主题切换）
 │   │   └── Logs.tsx              #   运行日志
 │   └── lib/tauri.ts              # Tauri API 封装
 │
@@ -140,7 +146,8 @@ bilibili-transcript-app/
 ├── resources/                    # 资源文件
 │   └── default.toml              # 默认配置模板
 └── docs/                         # 文档
-    └── implementation-plan.md    # 实施方案
+    ├── implementation-plan.md    # 实施方案
+    └── ui-design-plan.md         # UI 设计方案
 ```
 
 ## 安全特性
@@ -155,18 +162,27 @@ bilibili-transcript-app/
 
 ### 环境准备
 
-```bash
-# 安装 Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+**系统要求：** macOS 12.0+，Apple Silicon (M1/M2/M3/M4)
 
-# 安装 Node.js（推荐 v18+）
+```bash
+# 1. 安装 Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# 2. 安装 Node.js（推荐 v18+）
 brew install node
 
-# 安装 Tauri CLI
+# 3. 安装 Tauri CLI
 cargo install tauri-cli
 
-# 安装系统依赖
+# 4. 安装系统依赖（yt-dlp 和 ffmpeg 用于视频/音频下载和转码）
 brew install yt-dlp ffmpeg
+
+# 5. 验证安装
+rustc --version        # Rust 1.70+
+node --version         # v18+
+yt-dlp --version       # 2024.x+
+ffmpeg -version        # 6.x+
 ```
 
 ### 开发调试

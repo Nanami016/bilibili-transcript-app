@@ -91,3 +91,32 @@ pub async fn generate_summary(
 
     Ok(summary.to_string())
 }
+
+/// 测试 AI 摘要 API 连接
+pub async fn test_connection(api_url: &str, api_key: &str, model: &str) -> Result<bool> {
+    let client = Client::new();
+
+    let payload = serde_json::json!({
+        "model": model,
+        "messages": [
+            {"role": "user", "content": "Hi, reply with OK"}
+        ],
+        "max_tokens": 10
+    });
+
+    let url = resolve_api_url(api_url);
+    log::debug!("测试 AI 摘要连接: {}", url);
+
+    let resp = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&payload)
+        .send()
+        .await?;
+
+    let status = resp.status();
+    log::debug!("AI 摘要测试响应: status={}", status);
+
+    Ok(status.is_success())
+}

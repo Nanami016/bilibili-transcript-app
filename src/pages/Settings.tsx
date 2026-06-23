@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection } from "../lib/tauri";
+import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection, testAiSummaryConnection } from "../lib/tauri";
 import { useTheme } from "../components/Layout";
 
 function Settings() {
@@ -96,6 +96,15 @@ function Settings() {
   const handleTestWhisper = async () => {
     try {
       const result = await testWhisperConnection();
+      setToast({ message: result ? "连接成功 ✅" : "连接失败", type: result ? "success" : "error" });
+    } catch (error) {
+      setToast({ message: "测试失败: " + String(error), type: "error" });
+    }
+  };
+
+  const handleTestAiSummary = async () => {
+    try {
+      const result = await testAiSummaryConnection();
       setToast({ message: result ? "连接成功 ✅" : "连接失败", type: result ? "success" : "error" });
     } catch (error) {
       setToast({ message: "测试失败: " + String(error), type: "error" });
@@ -352,6 +361,7 @@ function Settings() {
               <label>模型名称</label>
               <input type="text" value={config?.ai_summary?.model || ""} onChange={(e) => updateField("ai_summary", "model", e.target.value)} placeholder="gpt-4o-mini" />
             </div>
+            <button className="btn btn-secondary" onClick={handleTestAiSummary}>🔌 测试连接</button>
           </>
         )}
       </div>

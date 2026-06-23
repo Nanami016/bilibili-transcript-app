@@ -441,21 +441,21 @@ function Layout() {
 
 ---
 
-## 六、实施顺序
+## 六、实施顺序 ✅
 
-| 步骤 | 文件 | 内容 |
-|------|------|------|
-| 1 | `global.css` | 新变量体系 + 旧变量 alias + 滚动条 + focus-visible + 所有组件样式 |
-| 2 | `Layout.tsx` | 主题初始化逻辑 |
-| 3 | `Sidebar.tsx` | 侧边栏重构（drag-region + 毛玻璃 + active 样式） |
-| 4 | `InputBar.tsx` + `VideoCard.tsx` | 首页核心组件 |
-| 5 | `Home.tsx` | 空状态/loading 美化 |
-| 6 | `TranscribeModal.tsx` | 弹窗美化 + 动画延迟渲染 |
-| 7 | `TaskPanel.tsx` + `TaskToast.tsx` | 任务系统组件 |
-| 8 | `Favorite.tsx` | 内联样式迁移 + CSS class |
-| 9 | `Settings.tsx` | 内联样式迁移 + 主题切换控件 |
-| 10 | `Logs.tsx` | 内联样式迁移 |
-| 11 | `global.css` | 删除旧变量 alias，最终清理 |
+| 步骤 | 文件 | 内容 | 状态 |
+|------|------|------|------|
+| 1 | `global.css` | 新变量体系 + 滚动条 + focus-visible + 所有组件样式 | ✅ |
+| 2 | `Layout.tsx` | 主题初始化逻辑 + `setTheme` 同步系统标题栏 | ✅ |
+| 3 | `Sidebar.tsx` | Tv 图标 + active 药丸样式 + 左侧 accent 色条 | ✅ |
+| 4 | `InputBar.tsx` + `VideoCard.tsx` | 毛玻璃输入框 + 卡片 hover 浮起 + GPU 加速 | ✅ |
+| 5 | `Home.tsx` | Film 空状态图标 + spinner 动画 | ✅ |
+| 6 | `TranscribeModal.tsx` | 毛玻璃弹窗 + 入场动画 + 200ms 延迟渲染文字 | ✅ |
+| 7 | `TaskPanel.tsx` + `TaskToast.tsx` | B站粉渐变进度条 + 彩色状态 badge | ✅ |
+| 8 | `Favorite.tsx` | 内联样式迁移为 CSS class | ✅ |
+| 9 | `Settings.tsx` | 内联样式迁移 + 主题切换控件 + AI 摘要测试连接 | ✅ |
+| 10 | `Logs.tsx` + `LogViewer.tsx` | 内联样式迁移为 CSS class | ✅ |
+| 11 | `global.css` | 删除旧变量 alias，最终清理 | ✅ |
 
 ---
 
