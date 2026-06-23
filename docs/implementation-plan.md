@@ -593,6 +593,15 @@ brew install yt-dlp ffmpeg
 - [x] **下载文件名清理** — 自动去除 yt-dlp 添加的格式 ID 后缀（如 `.f30033`）
 - [x] **音频格式兼容** — `find_downloaded_file` 支持 mp3/m4a/wav/ogg/flac/aac/opus
 
+### v0.4.0 修复与改进
+
+- [x] **设置页自动保存** — 配置变更后 800ms 自动写入磁盘，无需手动点击保存
+- [x] **音频文件精确检测** — 使用 yt-dlp `--print after_move:filepath` 获取最终路径，避免 fallback 扫描拿到旧文件导致转录内容错乱
+- [x] **ffmpeg 重复转换修复** — WAV 文件跳过 ffmpeg 转换，避免输入输出同路径导致失败
+- [x] **AI 摘要关闭提示** — 未启用 AI 摘要时在转录文档中显示明确说明
+- [x] **收藏夹加载更多按钮居中** — 使用 `gridColumn: 1 / -1` 跨列固定居中
+- [x] **Whisper 本地服务参考** — 替换为 [FunAudioLLM-Server](https://github.com/Nanami016/FunAudioLLM-Server)
+
 ---
 
 ## 八、关键技术点
@@ -665,3 +674,4 @@ config.toml
 - [yt-dlp 文档](https://github.com/yt-dlp/yt-dlp)
 - [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text)
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
+- [FunAudioLLM-Server](https://github.com/Nanami016/FunAudioLLM-Server)
