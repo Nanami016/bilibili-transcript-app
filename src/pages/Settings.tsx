@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection } from "../lib/tauri";
+import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection, testAiSummaryConnection } from "../lib/tauri";
+import { useTheme } from "../components/Layout";
 
 function Settings() {
   const [config, setConfig] = useState<any>(null);
@@ -11,6 +12,7 @@ function Settings() {
   const [manualCookie, setManualCookie] = useState("");
   const [browserLoading, setBrowserLoading] = useState(false);
   const skipAutoSaveRef = useRef(true);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => { loadConfig(); }, []);
 
@@ -21,7 +23,6 @@ function Settings() {
     }
   }, [toast]);
 
-  // 自动保存：config 变化后延迟 800ms 自动写入
   useEffect(() => {
     if (skipAutoSaveRef.current) {
       skipAutoSaveRef.current = false;
@@ -101,6 +102,15 @@ function Settings() {
     }
   };
 
+  const handleTestAiSummary = async () => {
+    try {
+      const result = await testAiSummaryConnection();
+      setToast({ message: result ? "连接成功 ✅" : "连接失败", type: result ? "success" : "error" });
+    } catch (error) {
+      setToast({ message: "测试失败: " + String(error), type: "error" });
+    }
+  };
+
   const updateField = (section: string, field: string, value: any) => {
     setConfig((prev: any) => ({
       ...prev,
@@ -109,12 +119,21 @@ function Settings() {
   };
 
   if (loading) {
-    return <div className="page"><div className="loading">加载中...</div></div>;
+    return (
+      <div className="page">
+        <div className="loading">
+          <div className="spinner-circle" />
+          <span>加载中...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="page settings-page">
-      <h2>设置</h2>
+      <div className="task-page-header">
+        <h2>设置</h2>
+      </div>
 
       {toast && (
         <div className={`toast toast-${toast.type}`}>
@@ -123,28 +142,53 @@ function Settings() {
         </div>
       )}
 
-      {/* ============ B站配置 ============ */}
+      {/* 外观 */}
+      <div className="settings-section">
+        <h3>🎨 外观</h3>
+        <div className="theme-switcher">
+          <button
+            className={`theme-btn ${theme === "system" ? "active" : ""}`}
+            onClick={() => setTheme("system")}
+          >
+            🌓 跟随系统
+          </button>
+          <button
+            className={`theme-btn ${theme === "light" ? "active" : ""}`}
+            onClick={() => setTheme("light")}
+          >
+            ☀️ 浅色
+          </button>
+          <button
+            className={`theme-btn ${theme === "dark" ? "active" : ""}`}
+            onClick={() => setTheme("dark")}
+          >
+            🌙 深色
+          </button>
+        </div>
+      </div>
+
+      {/* B站配置 */}
       <div className="settings-section">
         <h3>
           📺 B站账号
           {cookieStatus
-            ? <span style={{ fontSize: 12, color: "#52c41a", marginLeft: 8 }}>✅ 已配置</span>
-            : <span style={{ fontSize: 12, color: "#ff4d4f", marginLeft: 8 }}>⚠️ 未配置</span>
+            ? <span className="status-badge status-success" style={{ marginLeft: 8 }}>✅ 已配置</span>
+            : <span className="status-badge status-error" style={{ marginLeft: 8 }}>⚠️ 未配置</span>
           }
         </h3>
 
-        {/* 方式一：从浏览器读取 */}
         <div style={{ marginBottom: 24 }}>
-          <h4 style={{ fontSize: 14, marginBottom: 12, color: "#333" }}>
-            方式一：从浏览器读取（推荐）
-          </h4>
-          <p style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>
+          <h4 className="settings-subtitle">方式一：从浏览器读取（推荐）</h4>
+          <p className="form-hint" style={{ marginBottom: 12 }}>
             确保你已在浏览器中登录 B站，然后点击对应按钮读取 Cookie（包含 SESSDATA）
           </p>
           {browserLoading ? (
-            <div className="loading" style={{ height: "auto", padding: 16 }}>正在读取浏览器 Cookie...</div>
+            <div className="loading" style={{ height: "auto", padding: 16 }}>
+              <div className="spinner-circle" />
+              <span>正在读取浏览器 Cookie...</span>
+            </div>
           ) : (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="browser-btn-group">
               <button className="btn btn-primary" onClick={() => handleImportFromBrowser("chrome")}>
                 🌐 从 Chrome 读取
               </button>
@@ -164,15 +208,11 @@ function Settings() {
           </p>
         </div>
 
-        {/* 分隔线 */}
-        <div style={{ borderTop: "1px solid #e0e0e0", margin: "20px 0" }}></div>
+        <hr className="settings-divider" />
 
-        {/* 方式二：手动导入 */}
         <div>
-          <h4 style={{ fontSize: 14, marginBottom: 12, color: "#333" }}>
-            方式二：手动导入 Cookie
-          </h4>
-          <div className="tutorial-steps" style={{ marginBottom: 16 }}>
+          <h4 className="settings-subtitle">方式二：手动导入 Cookie</h4>
+          <div className="tutorial-steps">
             <div className="step">
               <span className="step-num">1</span>
               <div className="step-content">
@@ -210,9 +250,8 @@ function Settings() {
           <button className="btn btn-secondary" onClick={handleManualImport}>导入 Cookie</button>
         </div>
 
-        {/* 输出目录 */}
         <div style={{ marginTop: 20 }}>
-          <h4 style={{ fontSize: 14, marginBottom: 12, color: "#333" }}>📁 输出目录</h4>
+          <h4 className="settings-subtitle">📁 输出目录</h4>
           <div className="form-group">
             <label>视频下载路径</label>
             <input
@@ -243,7 +282,7 @@ function Settings() {
         </div>
       </div>
 
-      {/* ============ Whisper 配置 ============ */}
+      {/* Whisper 配置 */}
       <div className="settings-section">
         <h3>🎤 Whisper 语音转文字</h3>
         <div className="form-group">
@@ -258,14 +297,14 @@ function Settings() {
           {config?.whisper?.mode === "local" && (
             <p className="form-hint" style={{ marginTop: 4 }}>
               💡 本地 Whisper 服务部署可参考项目：
-              <a href="https://github.com/Nanami016/FunAudioLLM-Server" target="_blank" rel="noopener noreferrer" style={{ color: "#1890ff", marginLeft: 4 }}>
+              <a href="https://github.com/Nanami016/FunAudioLLM-Server" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", marginLeft: 4 }}>
                 FunAudioLLM-Server
               </a>
             </p>
           )}
         </div>
         <div className="form-group">
-          <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
+          <label>API 地址 <span style={{ color: "var(--status-error)" }}>*</span></label>
           <input
             type="text"
             value={config?.whisper?.api_url || ""}
@@ -294,23 +333,23 @@ function Settings() {
         <button className="btn btn-secondary" onClick={handleTestWhisper}>🔌 测试连接</button>
       </div>
 
-      {/* ============ AI 摘要 ============ */}
+      {/* AI 摘要 */}
       <div className="settings-section">
         <h3>🤖 AI 摘要</h3>
         <div className="form-group">
-          <label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={config?.ai_summary?.enabled || false}
               onChange={(e) => updateField("ai_summary", "enabled", e.target.checked)}
-            />{" "}
+            />
             启用 AI 摘要功能
           </label>
         </div>
         {config?.ai_summary?.enabled && (
           <>
             <div className="form-group">
-              <label>API 地址 <span style={{ color: "#ff4d4f" }}>*</span></label>
+              <label>API 地址 <span style={{ color: "var(--status-error)" }}>*</span></label>
               <input type="text" value={config?.ai_summary?.api_url || ""} onChange={(e) => updateField("ai_summary", "api_url", e.target.value)} placeholder="https://api.openai.com/v1" />
               <p className="form-hint">填写 base URL，自动追加 /chat/completions</p>
             </div>
@@ -322,6 +361,7 @@ function Settings() {
               <label>模型名称</label>
               <input type="text" value={config?.ai_summary?.model || ""} onChange={(e) => updateField("ai_summary", "model", e.target.value)} placeholder="gpt-4o-mini" />
             </div>
+            <button className="btn btn-secondary" onClick={handleTestAiSummary}>🔌 测试连接</button>
           </>
         )}
       </div>
@@ -331,7 +371,7 @@ function Settings() {
           {saving ? "保存中..." : "💾 保存设置"}
         </button>
         {autoSaved && (
-          <span style={{ fontSize: 13, color: "#52c41a", marginLeft: 12 }}>✅ 已自动保存</span>
+          <span className="auto-save-indicator">✅ 已自动保存</span>
         )}
       </div>
     </div>

@@ -1,9 +1,13 @@
 // 视频下载
-// 通过 yt-dlp 调用实现
+// 通过 yt-dlp 调用实现，支持实时进度解析
 
 use anyhow::{bail, Result};
 use std::path::PathBuf;
-use std::process::Command;
+use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
+
+/// 进度回调: (progress: 0.0~100.0, speed: String, eta: String)
+pub type ProgressCallback = Box<dyn Fn(f64, String, String) + Send + 'static>;
 
 /// 将 Cookie 字符串写入 Netscape 格式的 cookie 文件
 fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
@@ -16,7 +20,6 @@ fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
         if let Some((name, value)) = part.split_once('=') {
             let name = name.trim();
             let value = value.trim();
-            // 格式: domain	flag	path	secure	expires	name	value
             lines.push(format!(".bilibili.com\tTRUE\t/\tFALSE\t0\t{}\t{}", name, value));
         }
     }
@@ -26,8 +29,14 @@ fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
     Ok(cookie_path)
 }
 
-/// 下载视频
-pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf, cookie: &str) -> Result<PathBuf> {
+/// 下载视频（支持实时进度回调）
+pub async fn download_video(
+    url: &str,
+    format_id: &str,
+    output_dir: &PathBuf,
+    cookie: &str,
+    on_progress: Option<ProgressCallback>,
+) -> Result<PathBuf> {
     log::info!("开始下载视频: url={}, format={}", url, format_id);
     log::debug!("输出目录: {:?}", output_dir);
 
@@ -40,19 +49,20 @@ pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf, co
         "-o".to_string(),
         output_str.to_string(),
         "--no-playlist".to_string(),
+        "--newline".to_string(),  // 强制每行刷新，确保进度输出到 stderr
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
         "https://www.bilibili.com".to_string(),
     ];
 
-    // 格式选择：空或 "best" 都不传 -f，让 yt-dlp 自动选择最佳格式
+    // 格式选择
     if !format_id.is_empty() && format_id != "best" {
         args.push("-f".to_string());
         args.push(format_id.to_string());
     }
 
-    // 通过 Cookie 文件传递（B站需要 Cookie 才能下载）
+    // Cookie 文件
     let cookie_file = if !cookie.is_empty() {
         let path = write_cookie_file(cookie)?;
         args.push("--cookies".to_string());
@@ -68,24 +78,61 @@ pub async fn download_video(url: &str, format_id: &str, output_dir: &PathBuf, co
 
     log::debug!("执行 yt-dlp {:?}", args);
 
-    let output = Command::new("yt-dlp")
+    let mut child = Command::new("yt-dlp")
         .args(&args)
-        .output()?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())  // stderr 继承进程，调试日志直接输出
+        .spawn()?;
+
+    // 异步读取 stdout，解析进度（yt-dlp --newline 把进度输出到 stdout）
+    let stdout = child.stdout.take().expect("stdout should be piped");
+    let reader = tokio::io::BufReader::new(stdout);
+    let mut lines = reader.lines();
+
+    let mut last_progress = 0.0f64;
+    let mut stdout_lines: Vec<String> = Vec::new();
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        // 解析 yt-dlp 进度: [download] 45.2% of 50.0MiB at 2.5MiB/s ETA 00:15
+        if line.contains("[download]") && line.contains('%') {
+            if let Some(pct_str) = line.split_whitespace().find(|s| s.ends_with('%')) {
+                let pct_str = pct_str.trim_end_matches('%');
+                if let Ok(pct) = pct_str.parse::<f64>() {
+                    let speed = line.split("at ").nth(1)
+                        .and_then(|s| s.split_whitespace().next())
+                        .unwrap_or("")
+                        .to_string();
+                    let eta = line.split("ETA ").nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
+
+                    if pct > last_progress {
+                        last_progress = pct;
+                        if let Some(ref cb) = on_progress {
+                            cb(pct, speed, eta);
+                        }
+                    }
+                }
+            }
+        }
+        stdout_lines.push(line);
+    }
+
+    let status = child.wait().await?;
 
     // 清理 Cookie 文件
     if let Some(path) = &cookie_file {
         let _ = std::fs::remove_file(path);
     }
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let err_msg = if !stderr.is_empty() { stderr.to_string() } else { stdout.to_string() };
+    if !status.success() {
+        let err_msg = stdout_lines.join("\n");
         log::error!("yt-dlp 下载失败: {}", err_msg);
         bail!("yt-dlp 下载失败: {}", err_msg);
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = stdout_lines.join("\n");
     log::debug!("yt-dlp 输出: {}", stdout);
     let filepath = parse_download_path(&stdout, output_dir)
         .unwrap_or_else(|| output_dir.join("download.mp4"));
@@ -129,9 +176,10 @@ pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Val
 
     args.push(url.to_string());
 
-    let output = Command::new("yt-dlp")
+    let output = tokio::process::Command::new("yt-dlp")
         .args(&args)
-        .output()?;
+        .output()
+        .await?;
 
     if let Some(path) = &cookie_file {
         let _ = std::fs::remove_file(path);
@@ -167,7 +215,6 @@ fn clean_format_suffix(path: &std::path::Path) -> PathBuf {
         None => return path.to_path_buf(),
     };
 
-    // 匹配 .f + 数字 的格式 ID 后缀（如 f30033, f30280）
     let re = regex::Regex::new(r"\.f\d+$").unwrap();
     if re.is_match(filename) {
         let cleaned = re.replace(filename, "");
@@ -193,6 +240,13 @@ fn parse_download_path(output: &str, _output_dir: &PathBuf) -> Option<PathBuf> {
                 if let Some(path) = path.strip_prefix("[download]") {
                     return Some(PathBuf::from(path.trim()));
                 }
+            }
+        }
+        // --print after_move:filepath 输出
+        if line.starts_with('/') && !line.contains(' ') {
+            let p = PathBuf::from(line.trim());
+            if p.exists() {
+                return Some(p);
             }
         }
     }

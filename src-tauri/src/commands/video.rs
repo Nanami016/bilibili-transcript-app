@@ -37,7 +37,7 @@ pub async fn download_video(url: String, format_id: String) -> Result<String, St
     let config = crate::config::storage::load_config().map_err(|e| e.to_string())?;
     let output_dir = PathBuf::from(shellexpand::tilde(&config.bilibili.video_dir).to_string());
 
-    crate::download::video::download_video(&url, &format_id, &output_dir, &config.bilibili.cookie)
+    crate::download::video::download_video(&url, &format_id, &output_dir, &config.bilibili.cookie, None)
         .await
         .map(|path| path.to_string_lossy().to_string())
         .map_err(|e| e.to_string())
@@ -70,7 +70,7 @@ pub async fn download_audio(url: String) -> Result<String, String> {
     let config = crate::config::storage::load_config().map_err(|e| e.to_string())?;
     let output_dir = PathBuf::from(shellexpand::tilde(&config.bilibili.audio_dir).to_string());
 
-    crate::download::audio::download_audio(&url, &output_dir, &config.bilibili.cookie)
+    crate::download::audio::download_audio(&url, &output_dir, &config.bilibili.cookie, None)
         .await
         .map(|path| path.to_string_lossy().to_string())
         .map_err(|e| e.to_string())

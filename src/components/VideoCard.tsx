@@ -33,7 +33,6 @@ function VideoCard({
   const [selectedFormat, setSelectedFormat] = useState<string>("best");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 点击外部关闭下拉框
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -44,7 +43,6 @@ function VideoCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 格式列表更新时自动选中第一个
   useEffect(() => {
     if (formats.length > 0 && !formats.find((f) => f.format_id === selectedFormat)) {
       setSelectedFormat(formats[0].format_id);
@@ -60,10 +58,9 @@ function VideoCard({
         <img
           src={coverUrl}
           alt={title}
-          onLoad={() => console.log("封面加载成功:", coverUrl)}
           onError={(e) => {
-            console.error("封面加载失败:", coverUrl);
-            (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180' viewBox='0 0 320 180'%3E%3Crect fill='%23f0f0f0' width='320' height='180'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3E封面加载失败%3C/text%3E%3C/svg%3E";
+            (e.target as HTMLImageElement).src =
+              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180' viewBox='0 0 320 180'%3E%3Crect fill='%23f0f0f0' width='320' height='180'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='14' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3E封面加载失败%3C/text%3E%3C/svg%3E";
           }}
         />
         <span className="video-duration">{duration}</span>
@@ -78,7 +75,6 @@ function VideoCard({
             className="btn btn-secondary"
             onClick={() => {
               if (formats.length === 0) {
-                // 没有格式列表时直接下载
                 onDownloadVideo("best");
               } else {
                 setShowFormats(!showFormats);
@@ -106,13 +102,8 @@ function VideoCard({
                   <span className="format-desc">{f.description}</span>
                 </div>
               ))}
-              {!formats.some((f) => {
-                const h = parseInt(f.quality);
-                return h >= 720;
-              }) && (
-                <div className="format-hint">
-                  💡 720P 及以上需要 B站大会员
-                </div>
+              {!formats.some((f) => parseInt(f.quality) >= 720) && (
+                <div className="format-hint">💡 720P 及以上需要 B站大会员</div>
               )}
             </div>
           )}

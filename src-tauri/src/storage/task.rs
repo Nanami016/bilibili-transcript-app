@@ -126,6 +126,18 @@ pub fn update_task_title(conn: &Connection, task_id: i64, title: &str) -> Result
     Ok(())
 }
 
+/// 清理残留的 running/pending 状态任务（应用启动时调用）
+pub fn cleanup_stale_tasks(conn: &Connection) -> Result<()> {
+    let count = conn.execute(
+        "UPDATE tasks SET status = 'failed', error = '应用重启，任务未完成', updated_at = datetime('now', 'localtime'), completed_at = datetime('now', 'localtime') WHERE status IN ('running', 'pending')",
+        [],
+    )?;
+    if count > 0 {
+        log::info!("已清理 {} 个残留任务", count);
+    }
+    Ok(())
+}
+
 /// 按类型获取任务历史
 pub fn get_tasks_by_type(conn: &Connection, task_type: &str) -> Result<Vec<TaskRecord>> {
     let mut stmt = conn.prepare(

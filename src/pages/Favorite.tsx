@@ -9,6 +9,7 @@ import {
   startAudioDownload,
   startTranscribe,
 } from "../lib/tauri";
+import { ArrowLeft } from "lucide-react";
 
 interface FavoriteFolder {
   id: number;
@@ -42,7 +43,6 @@ function Favorite() {
   const [showTranscribeModal, setShowTranscribeModal] = useState(false);
   const [transcribeTarget, setTranscribeTarget] = useState<VideoInfo | null>(null);
 
-  // Toast 自动消失
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 4000);
@@ -77,7 +77,6 @@ function Favorite() {
       const result = await getFavoriteVideos(String(folder.id), 1);
       const data = result as { videos: VideoInfo[]; has_more: boolean; page: number };
 
-      // 通过 Rust 代理获取封面（避免 WebView 外部图片限制）
       const videosWithCovers = await Promise.all(
         data.videos.map(async (video) => {
           try {
@@ -199,14 +198,22 @@ function Favorite() {
 
       {selectedFolder ? (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-            <button className="btn btn-secondary" onClick={handleBack}>← 返回</button>
-            <h2>{selectedFolder.title}</h2>
-            <span style={{ color: "#666" }}>{selectedFolder.media_count} 个视频</span>
+          <div className="task-page-header">
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button className="btn btn-secondary btn-sm" onClick={handleBack}>
+                <ArrowLeft size={16} />
+                返回
+              </button>
+              <h2>{selectedFolder.title}</h2>
+              <span style={{ color: "var(--text-secondary)", fontSize: 14 }}>{selectedFolder.media_count} 个视频</span>
+            </div>
           </div>
 
           {videosLoading ? (
-            <div className="loading">加载视频列表...</div>
+            <div className="loading">
+              <div className="spinner-circle" />
+              <span>加载视频列表...</span>
+            </div>
           ) : videos.length === 0 ? (
             <div className="empty-state">
               <p>收藏夹中没有视频</p>
@@ -215,44 +222,40 @@ function Favorite() {
             <div className="favorites-list">
               {videos.map((video) => (
                 <div key={video.bvid} className="favorite-item" style={{ cursor: "default" }}>
-                  <div style={{ display: "flex", gap: 12 }}>
+                  <div className="favorite-video-row">
                     <img
                       src={video.cover_url}
                       alt={video.title}
-                      style={{ width: 120, height: 68, objectFit: "cover", borderRadius: 4 }}
-                      onLoad={() => console.log("封面加载成功:", video.cover_url)}
+                      className="favorite-video-cover"
                       onError={(e) => {
-                        console.error("封面加载失败:", video.cover_url, e);
-                        (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='68' viewBox='0 0 120 68'%3E%3Crect fill='%23f0f0f0' width='120' height='68'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='10' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3E封面%3C/text%3E%3C/svg%3E";
+                        (e.target as HTMLImageElement).src =
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='68' viewBox='0 0 120 68'%3E%3Crect fill='%23f0f0f0' width='120' height='68'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='10' x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle'%3E封面%3C/text%3E%3C/svg%3E";
                       }}
                     />
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ fontSize: 14, marginBottom: 4 }}>{video.title}</h4>
-                      <p style={{ fontSize: 12, color: "#666" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 className="favorite-video-title">{video.title}</h4>
+                      <p className="favorite-video-meta">
                         {video.author} · {formatDuration(video.duration)}
                       </p>
                     </div>
                   </div>
-                  <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <div className="favorite-actions">
                     <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      className="btn btn-secondary btn-sm"
                       onClick={() => handleDownloadVideo(video)}
                       title="下载视频"
                     >
                       下载视频
                     </button>
                     <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      className="btn btn-secondary btn-sm"
                       onClick={() => handleDownloadAudio(video)}
                       title="下载音频"
                     >
                       下载音频
                     </button>
                     <button
-                      className="btn btn-primary"
-                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      className="btn btn-primary btn-sm"
                       onClick={() => handleTranscribe(video)}
                       title="语音转录"
                     >
@@ -262,19 +265,21 @@ function Favorite() {
                 </div>
               ))}
               {hasMore && (
-                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "16px 0" }}>
+                <div className="favorites-load-more">
                   <button
                     className="btn btn-secondary"
                     onClick={handleLoadMore}
                     disabled={loadingMore}
                     style={{ minWidth: 120 }}
                   >
-                    {loadingMore ? "加载中..." : "加载更多"}
+                    {loadingMore ? (
+                      <><div className="spinner-circle" style={{ width: 16, height: 16, borderWidth: 2 }} /> 加载中...</>
+                    ) : "加载更多"}
                   </button>
                 </div>
               )}
               {!hasMore && videos.length > 0 && (
-                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "12px 0", color: "#999", fontSize: 13 }}>
+                <div className="favorites-footer">
                   已加载全部 {videos.length} 个视频
                 </div>
               )}
@@ -283,12 +288,17 @@ function Favorite() {
         </>
       ) : (
         <>
-          <h2>我的收藏夹</h2>
+          <div className="task-page-header">
+            <h2>我的收藏夹</h2>
+          </div>
 
           {loading ? (
-            <div className="loading">加载中...</div>
+            <div className="loading">
+              <div className="spinner-circle" />
+              <span>加载中...</span>
+            </div>
           ) : error ? (
-            <div className="empty-state" style={{ color: "#ff4d4f" }}>
+            <div className="empty-state" style={{ color: "var(--status-error)" }}>
               <p>{error}</p>
               <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={loadFavorites}>
                 重试
@@ -306,8 +316,8 @@ function Favorite() {
                   className="favorite-item"
                   onClick={() => handleSelectFolder(folder)}
                 >
-                  <h3>{folder.title}</h3>
-                  <span>{folder.media_count} 个视频</span>
+                  <h3 style={{ fontSize: 16, marginBottom: 4 }}>{folder.title}</h3>
+                  <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>{folder.media_count} 个视频</span>
                 </div>
               ))}
             </div>

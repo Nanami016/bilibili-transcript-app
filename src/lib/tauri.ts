@@ -98,6 +98,8 @@ export const startTranscribe = (
   });
 export const startAiSummary = (bvid: string) =>
   invoke<number>("start_ai_summary", { bvid });
+export const testAiSummaryConnection = () =>
+  invoke<boolean>("test_ai_summary_connection");
 export const cancelTask = (taskId: number) =>
   invoke<void>("cancel_task", { taskId });
 export const deleteTaskRecord = (taskId: number) =>

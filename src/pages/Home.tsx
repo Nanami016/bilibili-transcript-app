@@ -11,6 +11,7 @@ import {
   startAudioDownload,
   startTranscribe,
 } from "../lib/tauri";
+import { Film } from "lucide-react";
 
 interface VideoInfo {
   bvid: string;
@@ -40,7 +41,6 @@ function Home() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [showTranscribeModal, setShowTranscribeModal] = useState(false);
 
-  // Toast 自动消失
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 4000);
@@ -57,21 +57,16 @@ function Home() {
     try {
       const info = await parseVideo(url);
       const vi = info as VideoInfo;
-      console.log("Video info:", vi);
-      console.log("Cover URL:", vi.cover_url);
 
-      // 通过 Rust 代理获取封面（避免 WebView 外部图片限制）
       try {
         const coverData = await fetchCover(vi.cover_url);
         vi.cover_url = coverData as string;
-        console.log("封面获取成功");
       } catch (e) {
         console.error("封面获取失败:", e);
       }
 
       setVideoInfo(vi);
 
-      // 获取可用格式列表
       try {
         const videoUrl = `https://www.bilibili.com/video/${vi.bvid}`;
         const fmts = await getVideoFormats(videoUrl);
@@ -159,10 +154,15 @@ function Home() {
       />
 
       <div className="content-area">
-        {loading && <div className="loading">解析中...</div>}
+        {loading && (
+          <div className="loading">
+            <div className="spinner-circle" />
+            <span>解析中...</span>
+          </div>
+        )}
 
         {error && (
-          <div className="empty-state" style={{ color: "#ff4d4f" }}>
+          <div className="empty-state" style={{ color: "var(--status-error)" }}>
             <p>{error}</p>
           </div>
         )}
@@ -181,12 +181,15 @@ function Home() {
             />
 
             {actionLoading && (
-              <div className="loading">
-                {actionLoading === "transcribe"
-                  ? "正在启动转录任务..."
-                  : actionLoading === "downloadVideo"
-                  ? "正在启动视频下载..."
-                  : "正在启动音频下载..."}
+              <div className="loading" style={{ height: "auto", marginTop: 16 }}>
+                <div className="spinner-circle" />
+                <span>
+                  {actionLoading === "transcribe"
+                    ? "正在启动转录任务..."
+                    : actionLoading === "downloadVideo"
+                    ? "正在启动视频下载..."
+                    : "正在启动音频下载..."}
+                </span>
               </div>
             )}
           </>
@@ -194,6 +197,7 @@ function Home() {
 
         {!videoInfo && !loading && !error && (
           <div className="empty-state">
+            <Film size={48} className="empty-state-icon" />
             <p>输入 B站视频链接开始使用</p>
           </div>
         )}

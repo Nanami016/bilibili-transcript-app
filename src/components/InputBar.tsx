@@ -18,7 +18,7 @@ function InputBar({ onSearch }: InputBarProps) {
   return (
     <form className="input-bar" onSubmit={handleSubmit}>
       <div className="input-wrapper">
-        <Search size={20} className="search-icon" />
+        <Search size={18} className="search-icon" />
         <input
           type="text"
           value={url}
