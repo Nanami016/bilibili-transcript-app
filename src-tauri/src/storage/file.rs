@@ -21,7 +21,7 @@ pub fn render_txt(record: &TranscriptRecord, output_dir: &Path) -> Result<PathBu
     let filepath = output_dir.join(filename);
 
     // 渲染内容
-    let summary = record.summary.as_deref().unwrap_or("【AI待处理：请阅读全文后，替换此行，写结构化摘要】");
+    let summary = record.summary.as_deref().unwrap_or("【AI 摘要未生成：当前未启用 AI 摘要功能，可在设置中开启后重新转录】");
     let content = format!(
         r#"================================================================================
 B站视频转录文档
