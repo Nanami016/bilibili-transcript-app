@@ -110,31 +110,40 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
     let mp3_path = clean_format_suffix(&mp3_path);
     log::debug!("音频文件: {:?}", mp3_path);
 
-    // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
-    log::debug!("Step 2: ffmpeg 转换为 16kHz WAV");
+    // 如果文件已经是 WAV 格式，跳过转换
     let wav_path = mp3_path.with_extension("wav");
-    let ffmpeg_output = Command::new("ffmpeg")
-        .args([
-            "-y",
-            "-i",
-            &mp3_path.to_string_lossy(),
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            "-c:a",
-            "pcm_s16le",
-            &wav_path.to_string_lossy(),
-        ])
-        .output()?;
+    if mp3_path.extension().and_then(|e| e.to_str()) == Some("wav") {
+        log::debug!("音频已是 WAV 格式，跳过 ffmpeg 转换");
+        // 如果文件不在目标路径，复制一份
+        if mp3_path != wav_path {
+            std::fs::copy(&mp3_path, &wav_path)?;
+        }
+    } else {
+        // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
+        log::debug!("Step 2: ffmpeg 转换为 16kHz WAV");
+        let ffmpeg_output = Command::new("ffmpeg")
+            .args([
+                "-y",
+                "-i",
+                &mp3_path.to_string_lossy(),
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                "-c:a",
+                "pcm_s16le",
+                &wav_path.to_string_lossy(),
+            ])
+            .output()?;
 
-    if !ffmpeg_output.status.success() {
-        let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
-        log::error!("ffmpeg 音频转换失败: {}", stderr);
-        bail!("ffmpeg 音频转换失败: {}", stderr);
+        if !ffmpeg_output.status.success() {
+            let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
+            log::error!("ffmpeg 音频转换失败: {}", stderr);
+            bail!("ffmpeg 音频转换失败: {}", stderr);
+        }
+
+        let _ = std::fs::remove_file(&mp3_path);
     }
-
-    let _ = std::fs::remove_file(&mp3_path);
 
     log::info!("音频提取完成: {:?}", wav_path);
     Ok(wav_path)
