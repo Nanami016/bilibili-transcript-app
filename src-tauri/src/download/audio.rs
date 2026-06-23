@@ -1,9 +1,13 @@
 // 音频提取
-// 通过 yt-dlp + ffmpeg 实现
+// 通过 yt-dlp + ffmpeg 实现，支持实时进度解析
 
 use anyhow::{bail, Result};
 use std::path::PathBuf;
-use std::process::Command;
+use tokio::io::AsyncBufReadExt;
+use tokio::process::Command;
+
+/// 进度回调: (progress: 0.0~100.0, speed: String, eta: String)
+pub type ProgressCallback = Box<dyn Fn(f64, String, String) + Send + 'static>;
 
 /// 将 Cookie 字符串写入 Netscape 格式的 cookie 文件
 fn write_cookie_file(cookie: &str) -> Result<PathBuf> {
@@ -47,8 +51,13 @@ fn clean_format_suffix(path: &std::path::Path) -> std::path::PathBuf {
     path.to_path_buf()
 }
 
-/// 提取音频（下载 + 转 WAV）
-pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Result<PathBuf> {
+/// 提取音频（下载 + 转 WAV，支持实时进度回调）
+pub async fn extract_audio(
+    url: &str,
+    output_dir: &PathBuf,
+    cookie: &str,
+    on_progress: Option<ProgressCallback>,
+) -> Result<PathBuf> {
     log::info!("开始提取音频: {}", url);
     std::fs::create_dir_all(output_dir)?;
 
@@ -64,8 +73,7 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
         "-o".to_string(),
         mp3_str.to_string(),
         "--no-playlist".to_string(),
-        "--print".to_string(),
-        "after_move:filepath".to_string(),
+        "--newline".to_string(),  // 强制每行刷新
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -86,29 +94,95 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
 
     log::debug!("执行 yt-dlp {:?}", args);
 
-    let output = Command::new("yt-dlp")
+    let mut child = Command::new("yt-dlp")
         .args(&args)
-        .output()?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()?;
+
+    // 异步读取 stdout，解析进度
+    let stdout_pipe = child.stdout.take().expect("stdout should be piped");
+    let reader = tokio::io::BufReader::new(stdout_pipe);
+    let mut lines = reader.lines();
+
+    let mut last_progress = 0.0f64;
+    let mut stdout_lines: Vec<String> = Vec::new();
+    let mut final_path: Option<PathBuf> = None;
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        // 解析 yt-dlp 进度（输出到 stdout）
+        if line.contains("[download]") && line.contains('%') {
+            if let Some(pct_str) = line.split_whitespace().find(|s| s.ends_with('%')) {
+                let pct_str = pct_str.trim_end_matches('%');
+                if let Ok(pct) = pct_str.parse::<f64>() {
+                    let speed = line.split("at ").nth(1)
+                        .and_then(|s| s.split_whitespace().next())
+                        .unwrap_or("")
+                        .to_string();
+                    let eta = line.split("ETA ").nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
+
+                    if pct > last_progress {
+                        last_progress = pct;
+                        if let Some(ref cb) = on_progress {
+                            cb(pct, speed, eta);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 匹配文件路径（多种格式）
+        let trimmed = line.trim();
+        if trimmed.starts_with('/') && !trimmed.contains('[') && !trimmed.contains('%') {
+            // --print after_move:filepath 输出的纯路径行
+            final_path = Some(PathBuf::from(trimmed));
+        } else if trimmed.contains("[download]") && trimmed.contains("has already been downloaded") {
+            // [download] /path/to/file.mp3 has already been downloaded
+            if let Some(path_str) = trimmed.split("[download]").nth(1) {
+                let path_str = path_str.split("has already been downloaded").next().unwrap_or("").trim();
+                final_path = Some(PathBuf::from(path_str));
+            }
+        } else if trimmed.contains("[ExtractAudio]") && trimmed.contains("Not converting audio") {
+            // [ExtractAudio] Not converting audio /path/to/file.mp3; file is already in target format mp3
+            if let Some(path_str) = trimmed.split("Not converting audio").nth(1) {
+                let path_str = path_str.split(';').next().unwrap_or("").trim();
+                final_path = Some(PathBuf::from(path_str));
+            }
+        } else if trimmed.contains("[ExtractAudio]") && trimmed.contains("Destination:") {
+            // [ExtractAudio] Destination: /path/to/file.mp3
+            if let Some(path_str) = trimmed.split("Destination:").nth(1) {
+                final_path = Some(PathBuf::from(path_str.trim()));
+            }
+        }
+
+        stdout_lines.push(line);
+    }
+
+    let status = child.wait().await?;
 
     if let Some(path) = &cookie_file {
         let _ = std::fs::remove_file(path);
     }
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let err_msg = if !stderr.is_empty() { stderr.to_string() } else { stdout.to_string() };
+    if !status.success() {
+        let err_msg = stdout_lines.join("\n");
         log::error!("yt-dlp 音频下载失败: {}", err_msg);
         bail!("yt-dlp 音频下载失败: {}", err_msg);
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = stdout_lines.join("\n");
     log::debug!("yt-dlp 输出: {}", stdout);
 
-    let mp3_path = find_downloaded_file(&stdout, output_dir, "mp3")
+    // 等待文件写入完成
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    let mp3_path = final_path
+        .or_else(|| find_downloaded_file_from_lines(&stdout_lines, output_dir, "mp3"))
         .ok_or_else(|| anyhow::anyhow!("无法找到下载的音频文件"))?;
 
-    // 清理文件名中的格式 ID 后缀
     let mp3_path = clean_format_suffix(&mp3_path);
     log::debug!("音频文件: {:?}", mp3_path);
 
@@ -116,7 +190,6 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
     let wav_path = mp3_path.with_extension("wav");
     if mp3_path.extension().and_then(|e| e.to_str()) == Some("wav") {
         log::debug!("音频已是 WAV 格式，跳过 ffmpeg 转换");
-        // 如果文件不在目标路径，复制一份
         if mp3_path != wav_path {
             std::fs::copy(&mp3_path, &wav_path)?;
         }
@@ -136,7 +209,8 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
                 "pcm_s16le",
                 &wav_path.to_string_lossy(),
             ])
-            .output()?;
+            .output()
+            .await?;
 
         if !ffmpeg_output.status.success() {
             let stderr = String::from_utf8_lossy(&ffmpeg_output.stderr);
@@ -151,8 +225,13 @@ pub async fn extract_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Res
     Ok(wav_path)
 }
 
-/// 仅下载音频（不转换格式）
-pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Result<PathBuf> {
+/// 仅下载音频（不转换格式，支持实时进度回调）
+pub async fn download_audio(
+    url: &str,
+    output_dir: &PathBuf,
+    cookie: &str,
+    on_progress: Option<ProgressCallback>,
+) -> Result<PathBuf> {
     log::info!("下载音频: {}", url);
     std::fs::create_dir_all(output_dir)?;
 
@@ -166,8 +245,7 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
         "-o".to_string(),
         output_str.to_string(),
         "--no-playlist".to_string(),
-        "--print".to_string(),
-        "after_move:filepath".to_string(),
+        "--newline".to_string(),
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
@@ -185,27 +263,83 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
 
     args.push(url.to_string());
 
-    let output = Command::new("yt-dlp")
+    log::debug!("执行 yt-dlp {:?}", args);
+
+    let mut child = Command::new("yt-dlp")
         .args(&args)
-        .output()?;
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()?;
+
+    let stdout_pipe = child.stdout.take().expect("stdout should be piped");
+    let reader = tokio::io::BufReader::new(stdout_pipe);
+    let mut lines = reader.lines();
+
+    let mut last_progress = 0.0f64;
+    let mut stdout_lines: Vec<String> = Vec::new();
+    let mut final_path: Option<PathBuf> = None;
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        if line.contains("[download]") && line.contains('%') {
+            if let Some(pct_str) = line.split_whitespace().find(|s| s.ends_with('%')) {
+                let pct_str = pct_str.trim_end_matches('%');
+                if let Ok(pct) = pct_str.parse::<f64>() {
+                    let speed = line.split("at ").nth(1)
+                        .and_then(|s| s.split_whitespace().next())
+                        .unwrap_or("")
+                        .to_string();
+                    let eta = line.split("ETA ").nth(1)
+                        .unwrap_or("")
+                        .trim()
+                        .to_string();
+
+                    if pct > last_progress {
+                        last_progress = pct;
+                        if let Some(ref cb) = on_progress {
+                            cb(pct, speed, eta);
+                        }
+                    }
+                }
+            }
+        }
+
+        let trimmed = line.trim();
+        // --print after_move:filepath 输出的纯路径行（非 [ 开头，非空，不包含特殊标记）
+        if !trimmed.is_empty() && !trimmed.starts_with('[') && !trimmed.contains("Destination:") && !trimmed.contains('%') && trimmed.starts_with('/') {
+            final_path = Some(PathBuf::from(trimmed));
+        }
+
+        stdout_lines.push(line);
+    }
+
+    let status = child.wait().await?;
 
     if let Some(path) = &cookie_file {
         let _ = std::fs::remove_file(path);
     }
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let err_msg = if !stderr.is_empty() { stderr.to_string() } else { stdout.to_string() };
+    log::debug!("yt-dlp exit status: {}", status);
+    log::debug!("yt-dlp stdout lines count: {}", stdout_lines.len());
+    for (i, line) in stdout_lines.iter().enumerate() {
+        log::debug!("yt-dlp stdout[{}]: {}", i, line);
+    }
+    log::debug!("yt-dlp final_path: {:?}", final_path);
+
+    if !status.success() {
+        let err_msg = stdout_lines.join("\n");
         log::error!("yt-dlp 音频下载失败: {}", err_msg);
         bail!("yt-dlp 音频下载失败: {}", err_msg);
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let filepath = find_downloaded_file(&stdout, output_dir, "mp3")
+    let filepath = final_path
+        .or_else(|| find_downloaded_file_from_lines(&stdout_lines, output_dir, "mp3"))
         .ok_or_else(|| anyhow::anyhow!("无法找到下载的音频文件"))?;
 
-    // 清理文件名中的格式 ID 后缀
+    log::debug!("解析到文件路径: {:?}", filepath);
+
+    // 等待文件写入完成（yt-dlp 可能需要一点时间完成文件移动）
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
     let clean_path = clean_format_suffix(&filepath);
     if clean_path != filepath {
         if let Err(e) = std::fs::rename(&filepath, &clean_path) {
@@ -220,13 +354,12 @@ pub async fn download_audio(url: &str, output_dir: &PathBuf, cookie: &str) -> Re
     Ok(result)
 }
 
-/// 从 yt-dlp 输出中查找下载的文件
-fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option<PathBuf> {
-    // 最高优先级：--print after_move:filepath 输出的最终文件路径
-    // --print 输出的是纯路径行（无 [download] 前缀），取最后一个有效路径
-    for line in output.lines().rev() {
+/// 从输出行中查找下载的文件
+fn find_downloaded_file_from_lines(lines: &[String], _output_dir: &PathBuf, _ext: &str) -> Option<PathBuf> {
+    // 优先匹配: --print after_move:filepath 输出的纯路径行
+    for line in lines.iter().rev() {
         let trimmed = line.trim();
-        if !trimmed.is_empty() && !trimmed.starts_with('[') && !trimmed.contains("Destination:") {
+        if !trimmed.is_empty() && trimmed.starts_with('/') && !trimmed.contains('[') && !trimmed.contains('%') {
             let p = PathBuf::from(trimmed);
             if p.exists() {
                 log::debug!("从 --print 输出获取文件路径: {:?}", p);
@@ -235,42 +368,59 @@ fn find_downloaded_file(output: &str, output_dir: &PathBuf, ext: &str) -> Option
         }
     }
 
-    // 次优先级：从 yt-dlp 输出的 Destination: 行获取路径
-    for line in output.lines() {
-        if line.contains("Destination:") {
-            if let Some(path) = line.split("Destination:").nth(1) {
-                let p = PathBuf::from(path.trim());
+    // 次匹配: [download] /path/to/file.mp3 has already been downloaded
+    for line in lines.iter().rev() {
+        if line.contains("[download]") && line.contains("has already been downloaded") {
+            if let Some(path_str) = line.split("[download]").nth(1) {
+                let path_str = path_str.split("has already been downloaded").next().unwrap_or("").trim();
+                let p = PathBuf::from(path_str);
                 if p.exists() {
+                    log::debug!("从 'already downloaded' 获取文件路径: {:?}", p);
                     return Some(p);
                 }
-                log::debug!("Destination 路径已不存在: {:?}", p);
             }
         }
     }
 
-    // 最后 fallback：扫描目录中最近修改的音频文件
-    log::warn!("无法从 yt-dlp 输出获取文件路径，回退到目录扫描");
-    let audio_exts = [ext, "m4a", "wav", "ogg", "flac", "aac", "opus"];
-    let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
-    if let Ok(entries) = std::fs::read_dir(output_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let is_audio = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| audio_exts.contains(&e))
-                .unwrap_or(false);
-            if is_audio {
-                if let Ok(metadata) = entry.metadata() {
-                    if let Ok(modified) = metadata.modified() {
-                        if latest.is_none() || modified > latest.as_ref().unwrap().0 {
-                            latest = Some((modified, path));
-                        }
-                    }
+    // 次匹配: [ExtractAudio] Not converting audio /path/to/file.mp3
+    for line in lines.iter().rev() {
+        if line.contains("[ExtractAudio]") && line.contains("Not converting audio") {
+            if let Some(path_str) = line.split("Not converting audio").nth(1) {
+                let path_str = path_str.split(';').next().unwrap_or("").trim();
+                let p = PathBuf::from(path_str);
+                if p.exists() {
+                    log::debug!("从 ExtractAudio 获取文件路径: {:?}", p);
+                    return Some(p);
                 }
             }
         }
     }
 
-    latest.map(|(_, path)| path)
+    // 次匹配: [ExtractAudio] Destination: /path/to/file.mp3
+    for line in lines.iter().rev() {
+        if line.contains("[ExtractAudio]") && line.contains("Destination:") {
+            if let Some(path_str) = line.split("Destination:").nth(1) {
+                let p = PathBuf::from(path_str.trim());
+                if p.exists() {
+                    log::debug!("从 ExtractAudio Destination 获取文件路径: {:?}", p);
+                    return Some(p);
+                }
+            }
+        }
+    }
+
+    // 次匹配: [download] Destination: /path/to/file
+    for line in lines.iter().rev() {
+        if line.contains("[download]") && line.contains("Destination:") {
+            if let Some(path_str) = line.split("Destination:").nth(1) {
+                let p = PathBuf::from(path_str.trim());
+                if p.exists() {
+                    log::debug!("从 download Destination 获取文件路径: {:?}", p);
+                    return Some(p);
+                }
+            }
+        }
+    }
+
+    None
 }

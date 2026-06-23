@@ -72,8 +72,21 @@ impl TaskManager {
                 eta: "计算中...".to_string(),
             });
 
+            // 构建进度回调
+            let app_progress = app_clone.clone();
+            let progress_cb: crate::download::video::ProgressCallback = Box::new(move |pct, speed, eta| {
+                let _ = app_progress.emit("task-progress", task::TaskProgressEvent {
+                    task_id,
+                    task_type: "video_download".to_string(),
+                    status: "running".to_string(),
+                    progress: pct,
+                    speed,
+                    eta,
+                });
+            });
+
             // 执行下载
-            match crate::download::video::download_video(&url, &format_id, &output_dir, &config.bilibili.cookie).await {
+            match crate::download::video::download_video(&url, &format_id, &output_dir, &config.bilibili.cookie, Some(progress_cb)).await {
                 Ok(path) => {
                     let file_size = Self::format_file_size(&path);
                     let title = path.file_stem()
@@ -136,7 +149,20 @@ impl TaskManager {
                 eta: "计算中...".to_string(),
             });
 
-            match crate::download::audio::download_audio(&url, &output_dir, &config.bilibili.cookie).await {
+            // 构建进度回调
+            let app_progress = app_clone.clone();
+            let progress_cb: crate::download::audio::ProgressCallback = Box::new(move |pct, speed, eta| {
+                let _ = app_progress.emit("task-progress", task::TaskProgressEvent {
+                    task_id,
+                    task_type: "audio_download".to_string(),
+                    status: "running".to_string(),
+                    progress: pct,
+                    speed,
+                    eta,
+                });
+            });
+
+            match crate::download::audio::download_audio(&url, &output_dir, &config.bilibili.cookie, Some(progress_cb)).await {
                 Ok(path) => {
                     let file_size = Self::format_file_size(&path);
                     let title = path.file_stem()

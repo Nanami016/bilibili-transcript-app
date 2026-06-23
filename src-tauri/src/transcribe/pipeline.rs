@@ -60,7 +60,7 @@ pub async fn transcribe_video(
     );
 
     log::info!("正在下载音频...");
-    let audio_path = audio::extract_audio(url, &output_dir, cookie).await?;
+    let audio_path = audio::extract_audio(url, &output_dir, cookie, None).await?;
     log::info!("音频下载完成: {:?}", audio_path);
 
     // 创建 Whisper 客户端（优先使用按次传入的 prompt）

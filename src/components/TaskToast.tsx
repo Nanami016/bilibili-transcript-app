@@ -151,13 +151,13 @@ function TaskToast() {
 
           {toast.status === "completed" && (
             <div className="task-toast-meta">
-              <span style={{ color: "#52c41a" }}>已完成</span>
+              <span style={{ color: "var(--status-success)" }}>已完成</span>
             </div>
           )}
 
           {toast.status === "failed" && (
             <div className="task-toast-meta">
-              <span style={{ color: "#ff4d4f" }}>下载失败</span>
+              <span style={{ color: "var(--status-error)" }}>下载失败</span>
             </div>
           )}
         </div>

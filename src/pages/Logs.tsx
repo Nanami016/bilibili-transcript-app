@@ -43,34 +43,17 @@ function Logs() {
     }
   };
 
-  const levelColor = (level: string) => {
-    switch (level) {
-      case "ERROR":
-        return "#ff4d4f";
-      case "WARN":
-        return "#faad14";
-      case "INFO":
-        return "#52c41a";
-      case "DEBUG":
-        return "#1890ff";
-      case "TRACE":
-        return "#999";
-      default:
-        return "#999";
-    }
-  };
-
   const filteredLogs = filter === "ALL" ? logs : logs.filter((l) => l.level === filter);
 
   return (
     <div className="page logs-page">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div className="logs-header">
         <h2>📋 运行日志</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="logs-toolbar">
           <select
+            className="logs-filter-select"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #e0e0e0", fontSize: 13 }}
           >
             <option value="ALL">全部</option>
             <option value="ERROR">ERROR</option>
@@ -79,54 +62,35 @@ function Logs() {
             <option value="DEBUG">DEBUG</option>
             <option value="TRACE">TRACE</option>
           </select>
-          <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={refreshLogs}>
+          <button className="btn btn-secondary btn-sm" onClick={refreshLogs}>
             🔄 刷新
           </button>
-          <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={handleClear}>
+          <button className="btn btn-secondary btn-sm" onClick={handleClear}>
             🗑️ 清空
           </button>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#666" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
             <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
             自动滚动
           </label>
         </div>
       </div>
 
-      <div
-        style={{
-          background: "#1e1e1e",
-          borderRadius: 8,
-          padding: 16,
-          height: "calc(100vh - 160px)",
-          overflow: "auto",
-          fontFamily: "'SF Mono', Monaco, Consolas, monospace",
-          fontSize: 13,
-          lineHeight: 1.7,
-        }}
-      >
+      <div className="logs-terminal">
         {filteredLogs.length === 0 ? (
-          <div style={{ color: "#666", textAlign: "center", padding: 40 }}>暂无日志</div>
+          <div className="logs-empty">暂无日志</div>
         ) : (
           filteredLogs.map((log, i) => (
-            <div key={i} style={{ display: "flex", gap: 12 }}>
-              <span style={{ color: "#666", minWidth: 70 }}>{log.timestamp}</span>
-              <span
-                style={{
-                  color: levelColor(log.level),
-                  minWidth: 45,
-                  fontWeight: log.level === "ERROR" ? 600 : 400,
-                }}
-              >
-                {log.level}
-              </span>
-              <span style={{ color: "#d4d4d4", wordBreak: "break-all" }}>{log.message}</span>
+            <div key={i} className="log-line">
+              <span className="log-timestamp">{log.timestamp}</span>
+              <span className={`log-level log-level-${log.level}`}>{log.level}</span>
+              <span className="log-message">{log.message}</span>
             </div>
           ))
         )}
         <div ref={logEndRef} />
       </div>
 
-      <div style={{ marginTop: 8, fontSize: 12, color: "#999", textAlign: "right" }}>
+      <div className="logs-footer">
         共 {filteredLogs.length} 条日志
       </div>
     </div>

@@ -67,7 +67,7 @@ pub fn init_logger() {
     let logger = Box::new(AppLogger);
     // 忽略错误（可能已被初始化）
     let _ = log::set_boxed_logger(logger);
-    log::set_max_level(log::LevelFilter::Trace);
+    log::set_max_level(log::LevelFilter::Debug);
 }
 
 /// 获取所有运行日志

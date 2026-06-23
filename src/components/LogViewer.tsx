@@ -14,10 +14,7 @@ function LogViewer() {
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // 初始加载
     refreshLogs();
-
-    // 定时刷新
     const timer = setInterval(refreshLogs, 2000);
     return () => clearInterval(timer);
   }, []);
@@ -46,104 +43,45 @@ function LogViewer() {
     }
   };
 
-  const levelColor = (level: string) => {
-    switch (level) {
-      case "ERROR":
-        return "#ff4d4f";
-      case "WARN":
-        return "#faad14";
-      case "INFO":
-        return "#52c41a";
-      default:
-        return "#999";
-    }
-  };
-
   return (
     <div className="settings-section">
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          cursor: "pointer",
-        }}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
         onClick={() => setExpanded(!expanded)}
       >
         <h3>
           📋 运行日志
-          <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)", marginLeft: 8 }}>
             {logs.length} 条
           </span>
         </h3>
-        <span style={{ fontSize: 14, color: "#666" }}>{expanded ? "▲ 收起" : "▼ 展开"}</span>
+        <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>{expanded ? "▲ 收起" : "▼ 展开"}</span>
       </div>
 
       {expanded && (
         <>
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginTop: 12,
-              marginBottom: 12,
-            }}
-          >
-            <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={refreshLogs}>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12 }}>
+            <button className="btn btn-secondary btn-sm" onClick={refreshLogs}>
               🔄 刷新
             </button>
-            <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={handleClear}>
+            <button className="btn btn-secondary btn-sm" onClick={handleClear}>
               🗑️ 清空
             </button>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 12,
-                color: "#666",
-                marginLeft: "auto",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-              />
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-secondary)", marginLeft: "auto" }}>
+              <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
               自动滚动
             </label>
           </div>
 
-          <div
-            style={{
-              background: "#1e1e1e",
-              borderRadius: 8,
-              padding: 12,
-              maxHeight: 300,
-              overflow: "auto",
-              fontFamily: "'SF Mono', Monaco, Consolas, monospace",
-              fontSize: 12,
-              lineHeight: 1.6,
-            }}
-          >
+          <div className="logs-terminal" style={{ maxHeight: 300 }}>
             {logs.length === 0 ? (
-              <div style={{ color: "#666", textAlign: "center", padding: 20 }}>暂无日志</div>
+              <div className="logs-empty">暂无日志</div>
             ) : (
               logs.map((log, i) => (
-                <div key={i} style={{ display: "flex", gap: 8 }}>
-                  <span style={{ color: "#666", minWidth: 60 }}>{log.timestamp}</span>
-                  <span
-                    style={{
-                      color: levelColor(log.level),
-                      minWidth: 40,
-                      fontWeight: log.level === "ERROR" ? 600 : 400,
-                    }}
-                  >
-                    {log.level}
-                  </span>
-                  <span style={{ color: "#d4d4d4", wordBreak: "break-all" }}>
-                    {log.message}
-                  </span>
+                <div key={i} className="log-line">
+                  <span className="log-timestamp">{log.timestamp}</span>
+                  <span className={`log-level log-level-${log.level}`}>{log.level}</span>
+                  <span className="log-message">{log.message}</span>
                 </div>
               ))
             )}

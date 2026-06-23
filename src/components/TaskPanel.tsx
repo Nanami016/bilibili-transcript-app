@@ -25,7 +25,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
   const [activeTasks, setActiveTasks] = useState<TaskRecord[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
 
-  // Toast 自动消失
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 4000);
@@ -33,7 +32,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   }, [toast]);
 
-  // 加载历史记录
   const refreshHistory = useCallback(async () => {
     try {
       const result = await getTaskHistory(taskType);
@@ -43,7 +41,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   }, [taskType]);
 
-  // 加载活跃任务
   const refreshActive = useCallback(async () => {
     try {
       const result = await getActiveTasks();
@@ -58,7 +55,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     refreshActive();
   }, [refreshHistory, refreshActive]);
 
-  // 监听任务进度事件
   useEffect(() => {
     const unlistenFns: (() => void)[] = [];
 
@@ -76,7 +72,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
 
     onTaskCompleted((event: TaskCompletedEvent) => {
       if (event.task_type === taskType) {
-        // 移动到历史记录
         setActiveTasks((prev) => prev.filter((t) => t.id !== event.task_id));
         refreshHistory();
 
@@ -91,7 +86,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     return () => unlistenFns.forEach((fn) => fn());
   }, [taskType, refreshHistory]);
 
-  // 取消任务
   const handleCancel = async (taskId: number) => {
     try {
       await cancelTask(taskId);
@@ -102,7 +96,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   };
 
-  // 删除历史记录
   const handleDelete = async (taskId: number) => {
     try {
       await deleteTaskRecord(taskId);
@@ -112,7 +105,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   };
 
-  // 清空历史
   const handleClear = async () => {
     try {
       await clearTaskHistory(taskType);
@@ -122,7 +114,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   };
 
-  // 打开文件夹
   const handleOpenFolder = async () => {
     try {
       const dir = await getTaskOutputDir(taskType);
@@ -132,39 +123,34 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
     }
   };
 
-  // 状态图标
   const statusIcon = (status: string) => {
     switch (status) {
-      case "completed":
-        return "✅";
-      case "failed":
-        return "❌";
-      case "cancelled":
-        return "⚠️";
-      case "running":
-        return "⏳";
-      case "pending":
-        return "🕐";
-      default:
-        return "❓";
+      case "completed": return "✅";
+      case "failed": return "❌";
+      case "cancelled": return "⚠️";
+      case "running": return "⏳";
+      case "pending": return "🕐";
+      default: return "❓";
     }
   };
 
-  // 状态文本
+  const statusBadgeClass = (status: string) => {
+    switch (status) {
+      case "completed": return "badge-success";
+      case "failed": return "badge-error";
+      case "cancelled": return "badge-warning";
+      default: return "badge-info";
+    }
+  };
+
   const statusText = (status: string) => {
     switch (status) {
-      case "completed":
-        return "已完成";
-      case "failed":
-        return "失败";
-      case "cancelled":
-        return "已取消";
-      case "running":
-        return "进行中";
-      case "pending":
-        return "等待中";
-      default:
-        return status;
+      case "completed": return "已完成";
+      case "failed": return "失败";
+      case "cancelled": return "已取消";
+      case "running": return "进行中";
+      case "pending": return "等待中";
+      default: return status;
     }
   };
 
@@ -180,16 +166,15 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
       <div className="task-page-header">
         <h2>{icon} {title}</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={handleOpenFolder}>
+          <button className="btn btn-secondary btn-sm" onClick={handleOpenFolder}>
             📂 打开文件夹
           </button>
-          <button className="btn btn-secondary" style={{ fontSize: 12, padding: "4px 12px" }} onClick={handleClear}>
+          <button className="btn btn-secondary btn-sm" onClick={handleClear}>
             🗑️ 清空历史
           </button>
         </div>
       </div>
 
-      {/* 当前任务 */}
       {activeTasks.length > 0 && (
         <div className="task-section">
           <h3 className="task-section-title">▶ 当前任务</h3>
@@ -198,8 +183,7 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
               <div className="task-active-info">
                 <span className="task-active-title">{task.title || task.url}</span>
                 <button
-                  className="btn btn-secondary"
-                  style={{ fontSize: 11, padding: "2px 8px" }}
+                  className="btn btn-secondary btn-sm"
                   onClick={() => handleCancel(task.id)}
                 >
                   取消
@@ -218,7 +202,6 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
         </div>
       )}
 
-      {/* 历史记录 */}
       <div className="task-section">
         <h3 className="task-section-title">📋 历史记录</h3>
         {tasks.length === 0 ? (
@@ -242,12 +225,7 @@ function TaskPanel({ taskType, title, icon }: TaskPanelProps) {
                   </div>
                 </div>
                 <div className="task-history-right">
-                  <span
-                    className="task-history-badge"
-                    style={{
-                      color: task.status === "completed" ? "#52c41a" : task.status === "failed" ? "#ff4d4f" : "#999",
-                    }}
-                  >
+                  <span className={`task-history-badge ${statusBadgeClass(task.status)}`}>
                     {statusText(task.status)}
                   </span>
                   <button
