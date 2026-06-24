@@ -4,6 +4,11 @@ B站视频转录 macOS 原生应用 — 支持视频下载、音频提取、Whis
 
 基于 [Tauri v2](https://v2.tauri.app/) + React + TypeScript 构建的轻量级桌面应用。
 
+## 预览
+
+<!-- 将录制的 MP4 文件拖拽到 GitHub README 编辑框中，替换下方链接 -->
+https://github.com/Nanami016/bilibili-transcript-app/assets/REPLACE_WITH_YOUR_VIDEO_URL.mp4
+
 ## 功能
 
 | 功能 | 状态 | 说明 |

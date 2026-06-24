@@ -110,6 +110,7 @@ export const getTaskOutputDir = (taskType: string) =>
   invoke<string>("get_task_output_dir", { taskType });
 export const openFolder = (path: string) =>
   invoke<void>("open_folder", { path });
+export const getAppDataDir = () => invoke<string>("get_app_data_dir");
 
 // 事件监听
 export const onTaskProgress = (cb: (e: TaskProgressEvent) => void): Promise<UnlistenFn> =>
