@@ -58,6 +58,7 @@ fn main() {
             commands::cookie::import_cookie_from_browser,
             commands::log::get_run_logs,
             commands::log::clear_run_logs,
+            commands::log::get_log_dir,
             commands::task::get_task_history,
             commands::task::get_active_tasks,
             commands::task::start_video_download,

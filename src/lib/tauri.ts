@@ -36,6 +36,7 @@ export const importCookieFromBrowser = (browser: string) =>
 // 日志相关
 export const getRunLogs = () => invoke("get_run_logs");
 export const clearRunLogs = () => invoke("clear_run_logs");
+export const getLogDir = () => invoke<string>("get_log_dir");
 
 // 任务相关
 export interface TaskRecord {
