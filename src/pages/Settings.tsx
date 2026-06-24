@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection, testAiSummaryConnection } from "../lib/tauri";
+import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection, testAiSummaryConnection, openFolder, getAppDataDir } from "../lib/tauri";
 import { useTheme } from "../components/Layout";
 
 function Settings() {
@@ -111,6 +111,15 @@ function Settings() {
     }
   };
 
+  const handleOpenSettingsFolder = async () => {
+    try {
+      const dir = await getAppDataDir();
+      await openFolder(dir);
+    } catch {
+      // 忽略
+    }
+  };
+
   const updateField = (section: string, field: string, value: any) => {
     setConfig((prev: any) => ({
       ...prev,
@@ -133,6 +142,9 @@ function Settings() {
     <div className="page settings-page">
       <div className="task-page-header">
         <h2>设置</h2>
+        <button className="btn btn-secondary btn-sm" onClick={handleOpenSettingsFolder}>
+          📂 打开文件夹
+        </button>
       </div>
 
       {toast && (

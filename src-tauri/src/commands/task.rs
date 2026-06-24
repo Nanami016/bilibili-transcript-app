@@ -116,3 +116,12 @@ pub async fn open_folder(app: AppHandle, path: String) -> Result<(), String> {
     app.shell().open(&path, None).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+/// 获取应用数据目录路径 (~/.bilibili-transcript/)
+#[command]
+pub async fn get_app_data_dir() -> Result<String, String> {
+    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    let data_dir = home.join(".bilibili-transcript");
+    std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+    Ok(data_dir.to_string_lossy().to_string())
+}

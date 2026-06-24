@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getRunLogs, clearRunLogs } from "../lib/tauri";
+import { getRunLogs, clearRunLogs, openFolder, getAppDataDir } from "../lib/tauri";
 
 interface LogEntry {
   timestamp: string;
@@ -43,6 +43,15 @@ function Logs() {
     }
   };
 
+  const handleOpenLogFolder = async () => {
+    try {
+      const dir = await getAppDataDir();
+      await openFolder(dir);
+    } catch {
+      // 忽略
+    }
+  };
+
   const filteredLogs = filter === "ALL" ? logs : logs.filter((l) => l.level === filter);
 
   return (
@@ -50,6 +59,9 @@ function Logs() {
       <div className="logs-header">
         <h2>📋 运行日志</h2>
         <div className="logs-toolbar">
+          <button className="btn btn-secondary btn-sm" onClick={handleOpenLogFolder}>
+            📂 打开文件夹
+          </button>
           <select
             className="logs-filter-select"
             value={filter}
