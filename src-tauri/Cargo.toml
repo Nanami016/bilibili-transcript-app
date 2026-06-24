@@ -1,6 +1,6 @@
 [package]
 name = "bilibili-transcript-app"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 license = "MIT"
 description = "B站视频转录 macOS 应用"
@@ -30,6 +30,11 @@ regex = "1"
 shellexpand = "3"
 once_cell = "1"
 base64 = "0.22"
+aes = "0.8"
+cbc = "0.1"
+pbkdf2 = { version = "0.12", features = ["hmac"] }
+sha1 = "0.10"
+hex = "0.4"
 
 [features]
 default = ["custom-protocol"]
