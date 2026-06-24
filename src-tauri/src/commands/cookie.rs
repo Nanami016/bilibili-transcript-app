@@ -122,9 +122,20 @@ fn read_chrome_cookies_directly() -> Result<(String, String, String), String> {
     for row in rows {
         let (name, encrypted_value, value) = row.map_err(|e| format!("解析 Cookie 失败: {}", e))?;
 
+        log::debug!("找到 Cookie: name={}, value_len={}, encrypted_len={}", name, value.len(), encrypted_value.len());
+
         // 如果 value 为空，需要解密 encrypted_value
         let cookie_value = if value.is_empty() && !encrypted_value.is_empty() {
-            decrypt_chrome_cookie(&encrypted_value).unwrap_or_default()
+            match decrypt_chrome_cookie(&encrypted_value) {
+                Ok(v) => {
+                    log::debug!("解密成功: name={}, value_len={}", name, v.len());
+                    v
+                }
+                Err(e) => {
+                    log::warn!("解密失败: name={}, error={}", name, e);
+                    String::new()
+                }
+            }
         } else {
             value
         };
@@ -148,66 +159,58 @@ fn read_chrome_cookies_directly() -> Result<(String, String, String), String> {
 }
 
 /// 解密 Chrome Cookie（macOS Keychain）
+/// 参考 yt-dlp: macOS Chrome 使用 AES-128-CBC，IV 为 16 个空格
 fn decrypt_chrome_cookie(encrypted_value: &[u8]) -> Result<String, String> {
     // Chrome v10+ 使用 AES-128-CBC 加密
-    // 前 3 字节是 "v10" 或 "v11"
+    // 前 3 字节是版本前缀 "v10" 或 "v11"，剩余部分是密文
     if encrypted_value.len() < 3 {
         return Err("加密数据太短".to_string());
     }
 
     let version = &encrypted_value[..3];
     if version != b"v10" && version != b"v11" {
-        return Err(format!("不支持的加密版本: {:?}", version));
+        // 非 v10/v11 视为明文存储
+        return String::from_utf8(encrypted_value.to_vec())
+            .map_err(|e| format!("非加密 Cookie 解码失败: {}", e));
     }
 
-    // 从 Keychain 获取加密密钥
-    let key_hex = get_chrome_encryption_key()?;
+    // v10/v11: 前 3 字节版本 + 剩余字节为密文
+    let ciphertext = &encrypted_value[3..];
 
-    // 解密数据
-    // v10/v11: 3 bytes version + 16 bytes IV + encrypted data
-    if encrypted_value.len() < 19 {
-        return Err("加密数据格式错误".to_string());
-    }
+    // macOS Chrome 的 IV 是固定的 16 个空格 (0x20)
+    let iv: [u8; 16] = [b' '; 16];
 
-    let iv = &encrypted_value[3..19];
-    let data = &encrypted_value[19..];
+    // 从 Keychain 获取加密密钥（16 字节的派生密钥）
+    let key_bytes = get_chrome_encryption_key()?;
 
-    // 将 hex 字符串转换为字节数组
-    let key_bytes = hex::decode(&key_hex).map_err(|_| "密钥格式错误")?;
-    if key_bytes.len() != 16 {
-        return Err(format!("密钥长度错误: {} (期望 16)", key_bytes.len()));
-    }
+    log::debug!("解密 Cookie: version={:?}, ciphertext_len={}, key_len={}",
+        String::from_utf8_lossy(version), ciphertext.len(), key_bytes.len());
 
-    use aes::cipher::{block_padding::NoPadding, BlockDecryptMut, KeyIvInit};
+    // 使用 PKCS7 填充解密
+    use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
     use aes::Aes128;
 
     type Aes128CbcDec = cbc::Decryptor<Aes128>;
 
-    let mut buf = data.to_vec();
+    let mut buf = ciphertext.to_vec();
 
     let decryptor = Aes128CbcDec::new(
         aes::cipher::generic_array::GenericArray::from_slice(&key_bytes),
-        aes::cipher::generic_array::GenericArray::from_slice(iv),
+        aes::cipher::generic_array::GenericArray::from_slice(&iv),
     );
+
     let decrypted = decryptor
-        .decrypt_padded_mut::<NoPadding>(&mut buf)
-        .map_err(|_| "解密失败")?;
+        .decrypt_padded_mut::<Pkcs7>(&mut buf)
+        .map_err(|e| format!("AES 解密失败 (可能密钥不正确): {:?}", e))?;
 
-    // 移除 PKCS7 填充
-    if let Some(&last) = decrypted.last() {
-        let padding_len = last as usize;
-        if padding_len <= decrypted.len() && padding_len > 0 {
-            let actual_len = decrypted.len() - padding_len;
-            return String::from_utf8(decrypted[..actual_len].to_vec())
-                .map_err(|_| "解密结果不是有效的 UTF-8".to_string());
-        }
-    }
+    log::debug!("解密完成: decrypted_len={}", decrypted.len());
 
-    String::from_utf8(decrypted.to_vec()).map_err(|_| "解密结果不是有效的 UTF-8".to_string())
+    String::from_utf8(decrypted.to_vec())
+        .map_err(|e| format!("解密结果不是有效的 UTF-8: {}", e))
 }
 
-/// 从 macOS Keychain 获取 Chrome 加密密钥
-fn get_chrome_encryption_key() -> Result<String, String> {
+/// 从 macOS Keychain 获取 Chrome 加密密钥（返回 16 字节的派生密钥）
+fn get_chrome_encryption_key() -> Result<Vec<u8>, String> {
     use std::process::Command;
 
     let output = Command::new("security")
@@ -225,14 +228,22 @@ fn get_chrome_encryption_key() -> Result<String, String> {
         return Err("Keychain 返回的密钥为空".to_string());
     }
 
+    log::debug!("从 Keychain 获取到 Chrome 密钥 (长度={})", key.len());
+
     // Chrome 使用 PBKDF2 派生密钥
+    // 密码: Keychain 中的密钥 (UTF-8 字节)
+    // 盐: "saltysalt"
+    // 迭代次数: 1003
+    // 输出长度: 16 字节
     use pbkdf2::pbkdf2_hmac;
     use sha1::Sha1;
 
     let mut derived_key = [0u8; 16];
     pbkdf2_hmac::<Sha1>(key.as_bytes(), b"saltysalt", 1003, &mut derived_key);
 
-    Ok(hex::encode(derived_key))
+    log::debug!("PBKDF2 派生密钥完成 (hex={})", hex::encode(derived_key));
+
+    Ok(derived_key.to_vec())
 }
 
 /// 解析 Cookie 内容
