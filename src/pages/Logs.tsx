@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getRunLogs, clearRunLogs, openFolder, getAppDataDir } from "../lib/tauri";
+import { getRunLogs, clearRunLogs, openFolder, getLogDir } from "../lib/tauri";
 
 interface LogEntry {
   timestamp: string;
@@ -45,7 +45,7 @@ function Logs() {
 
   const handleOpenLogFolder = async () => {
     try {
-      const dir = await getAppDataDir();
+      const dir = await getLogDir();
       await openFolder(dir);
     } catch {
       // 忽略
