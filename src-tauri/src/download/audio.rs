@@ -92,7 +92,7 @@ pub async fn extract_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())  // 继承 stderr，避免 pipe 缓冲区满导致死锁
         .spawn()?;
 
     // 异步读取 stdout，解析进度
@@ -254,7 +254,7 @@ pub async fn download_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())  // 继承 stderr，避免 pipe 缓冲区满导致死锁
         .spawn()?;
 
     let stdout_pipe = child.stdout.take().expect("stdout should be piped");
