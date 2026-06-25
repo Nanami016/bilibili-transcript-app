@@ -74,7 +74,7 @@ pub async fn download_video(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())  // 继承 stderr，避免 pipe 缓冲区满导致死锁
         .spawn()?;
 
     // 异步读取 stdout，解析进度（yt-dlp --newline 把进度输出到 stdout）

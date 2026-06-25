@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.2 (2026-06-25)
+
+### Bug Fixes
+- **yt-dlp 下载/转录死锁**: v1.1.0 将 yt-dlp 的 stderr 改为 piped 但未读取，当 stderr 缓冲区写满时 yt-dlp 阻塞，导致下载和转录挂起。修复为 stderr 改回 inherit
+
 ## v1.1.1 (2026-06-25)
 
 ### Features
