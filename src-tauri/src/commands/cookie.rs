@@ -30,7 +30,11 @@ pub async fn import_cookie_from_browser(browser: String) -> Result<String, Strin
     // 先删除旧文件
     let _ = std::fs::remove_file(&cookie_path);
 
-    let output = Command::new("yt-dlp")
+    // 查找 yt-dlp 路径
+    let yt_dlp_path = find_yt_dlp()?;
+    log::debug!("执行 yt-dlp: {:?}", yt_dlp_path);
+
+    let output = Command::new(&yt_dlp_path)
         .args([
             "--cookies-from-browser",
             &browser,
@@ -44,6 +48,8 @@ pub async fn import_cookie_from_browser(browser: String) -> Result<String, Strin
         .map_err(|e| format!("执行 yt-dlp 失败: {}", e))?;
 
     log::debug!("yt-dlp 退出状态: {:?}", output.status);
+    log::debug!("yt-dlp stdout 长度: {}", output.stdout.len());
+    log::debug!("yt-dlp stderr: {}", String::from_utf8_lossy(&output.stderr));
 
     if !cookie_path.exists() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -71,6 +77,37 @@ pub async fn import_cookie_from_browser(browser: String) -> Result<String, Strin
 
     log::info!("从浏览器读取 Cookie 成功: uid={}", dede_uid);
     Ok(format!("成功从 {} 读取 Cookie (用户: {})", browser, dede_uid))
+}
+
+/// 查找 yt-dlp 可执行文件路径
+fn find_yt_dlp() -> Result<String, String> {
+    // 常见的 yt-dlp 安装路径
+    let candidates = [
+        "/opt/homebrew/bin/yt-dlp",
+        "/usr/local/bin/yt-dlp",
+        "/usr/bin/yt-dlp",
+    ];
+
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return Ok(path.to_string());
+        }
+    }
+
+    // 尝试用 which 查找
+    let output = std::process::Command::new("which")
+        .arg("yt-dlp")
+        .output()
+        .map_err(|e| format!("执行 which 失败: {}", e))?;
+
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path.is_empty() {
+            return Ok(path);
+        }
+    }
+
+    Err("未找到 yt-dlp，请先安装: brew install yt-dlp".to_string())
 }
 
 /// 解析 Cookie 内容
@@ -108,6 +145,16 @@ fn parse_cookie_content(content: &str) -> Result<(String, String, String), Strin
 #[command]
 pub async fn close_bilibili_login() -> Result<(), String> {
     Ok(())
+}
+
+/// 清除 Cookie
+#[command]
+pub async fn clear_cookie() -> Result<String, String> {
+    log::info!("清除 Cookie");
+    crate::bilibili::cookie::save_cookie("")
+        .map_err(|e| e.to_string())?;
+    log::info!("Cookie 已清除");
+    Ok("Cookie 已清除".to_string())
 }
 
 /// Cookie 条目
