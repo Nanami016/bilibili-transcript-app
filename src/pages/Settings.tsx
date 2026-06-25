@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, testWhisperConnection, testAiSummaryConnection, openFolder, getAppDataDir } from "../lib/tauri";
+import { getConfig, updateConfig, importCookie, importCookieFromBrowser, getCookieStatus, clearCookie, testWhisperConnection, testAiSummaryConnection, openFolder, getAppDataDir } from "../lib/tauri";
 import { useTheme } from "../components/Layout";
 
 function Settings() {
@@ -120,6 +120,17 @@ function Settings() {
     }
   };
 
+  const handleClearCookie = async () => {
+    try {
+      const result = await clearCookie();
+      setCookieStatus(false);
+      setToast({ message: result, type: "success" });
+      await loadConfig();
+    } catch (error) {
+      setToast({ message: "清除失败: " + String(error), type: "error" });
+    }
+  };
+
   const updateField = (section: string, field: string, value: any) => {
     setConfig((prev: any) => ({
       ...prev,
@@ -218,6 +229,18 @@ function Settings() {
           <p className="form-hint" style={{ marginTop: 8 }}>
             读取前请关闭对应浏览器，否则可能无法读取 Cookie
           </p>
+        </div>
+
+        <hr className="settings-divider" />
+
+        <div>
+          <h4 className="settings-subtitle">清除 Cookie</h4>
+          <p className="form-hint" style={{ marginBottom: 12 }}>
+            如果 Cookie 获取失败或需要重新导入，请先清除已保存的 Cookie
+          </p>
+          <button className="btn btn-secondary" onClick={handleClearCookie}>
+            🗑️ 清除已保存的 Cookie
+          </button>
         </div>
 
         <hr className="settings-divider" />

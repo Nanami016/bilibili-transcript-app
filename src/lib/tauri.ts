@@ -32,6 +32,7 @@ export const importCookie = (cookie: string) => invoke("import_cookie", { cookie
 export const getCookieStatus = () => invoke("get_cookie_status");
 export const importCookieFromBrowser = (browser: string) =>
   invoke("import_cookie_from_browser", { browser });
+export const clearCookie = () => invoke<string>("clear_cookie");
 
 // 日志相关
 export const getRunLogs = () => invoke("get_run_logs");

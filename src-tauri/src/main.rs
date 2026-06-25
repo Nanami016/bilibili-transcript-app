@@ -56,6 +56,7 @@ fn main() {
             commands::cookie::import_cookie,
             commands::cookie::get_cookie_status,
             commands::cookie::import_cookie_from_browser,
+            commands::cookie::clear_cookie,
             commands::log::get_run_logs,
             commands::log::clear_run_logs,
             commands::log::get_log_dir,

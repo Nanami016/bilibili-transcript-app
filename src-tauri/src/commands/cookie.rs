@@ -110,6 +110,16 @@ pub async fn close_bilibili_login() -> Result<(), String> {
     Ok(())
 }
 
+/// 清除 Cookie
+#[command]
+pub async fn clear_cookie() -> Result<String, String> {
+    log::info!("清除 Cookie");
+    crate::bilibili::cookie::save_cookie("")
+        .map_err(|e| e.to_string())?;
+    log::info!("Cookie 已清除");
+    Ok("Cookie 已清除".to_string())
+}
+
 /// Cookie 条目
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CookieEntry {
