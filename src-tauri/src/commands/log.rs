@@ -11,17 +11,21 @@ use tauri::command;
 /// 全局日志缓冲区
 static LOG_BUFFER: Lazy<Mutex<Vec<LogEntry>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+/// 会话启动时间戳，保证同一次启动的所有日志写入同一个文件
+static SESSION_START: Lazy<String> = Lazy::new(|| {
+    chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string()
+});
+
 /// 获取日志目录路径
 pub fn log_dir() -> PathBuf {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     home.join(".bilibili-transcript").join("logs")
 }
 
-/// 获取当日日志文件路径
+/// 获取当前会话日志文件路径（精确到时分秒，每次启动独立记录）
 fn log_file_path() -> PathBuf {
     let dir = log_dir();
-    let date = chrono::Local::now().format("%Y-%m-%d").to_string();
-    dir.join(format!("{}.log", date))
+    dir.join(format!("{}.log", *SESSION_START))
 }
 
 /// 日志条目
