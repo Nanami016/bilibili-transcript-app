@@ -332,8 +332,8 @@ function Settings() {
           {config?.whisper?.mode === "local" && (
             <p className="form-hint" style={{ marginTop: 4 }}>
               💡 本地 Whisper 服务部署可参考项目：
-              <a href="https://github.com/Nanami016/FunAudioLLM-Server" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", marginLeft: 4 }}>
-                FunAudioLLM-Server
+              <a href="https://github.com/Nanami016/qwen3-asr-server" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", marginLeft: 4 }}>
+                qwen3-asr-server
               </a>
             </p>
           )}
