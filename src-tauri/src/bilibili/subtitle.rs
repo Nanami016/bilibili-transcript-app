@@ -50,12 +50,13 @@ pub async fn try_get_subtitle(bvid: &str, cid: i64, cookie: &str) -> Result<Opti
         };
 
         log::info!("选择字幕: lan={}, source={}", item.lan, source);
-        let content = download_subtitle(&item.subtitle_url).await?;
-        log::info!("字幕下载成功: 长度={}", content.len());
+        let (content, duration_secs) = download_subtitle(&item.subtitle_url).await?;
+        log::info!("字幕下载成功: 长度={}, 时长={:?}s", content.len(), duration_secs);
         return Ok(Some(Subtitle {
             language: item.lan_doc.clone(),
             content,
             source,
+            duration_secs,
         }));
     }
 
@@ -117,7 +118,8 @@ async fn get_subtitle_list(
 }
 
 /// 下载字幕内容并转为纯文本
-async fn download_subtitle(url: &str) -> Result<String> {
+/// 返回 (纯文本, 字幕末尾时间戳秒数)
+async fn download_subtitle(url: &str) -> Result<(String, Option<f64>)> {
     log::debug!("下载字幕: {}", url);
     let client = Client::new();
 
@@ -138,16 +140,20 @@ async fn download_subtitle(url: &str) -> Result<String> {
     let data: serde_json::Value = resp.json().await?;
 
     let mut lines = Vec::new();
+    let mut last_to: Option<f64> = None;
     if let Some(body) = data["body"].as_array() {
         for item in body {
             if let Some(content) = item["content"].as_str() {
                 lines.push(content.to_string());
             }
+            if let Some(to) = item["to"].as_f64() {
+                last_to = Some(to);
+            }
         }
     }
 
-    log::debug!("字幕解析完成: {} 行", lines.len());
-    Ok(lines.join("\n"))
+    log::debug!("字幕解析完成: {} 行, 末尾时间戳: {:?}s", lines.len(), last_to);
+    Ok((lines.join("\n"), last_to))
 }
 
 /// 解析 SRT 格式字幕为纯文本

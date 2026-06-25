@@ -189,6 +189,7 @@ impl TaskManager {
     }
 
     /// 启动转录任务
+    #[allow(clippy::too_many_arguments)]
     pub async fn start_transcribe(
         &self,
         app: AppHandle,
@@ -197,6 +198,7 @@ impl TaskManager {
         whisper_prompt: Option<String>,
         ai_prompt: Option<String>,
         ai_context: Option<String>,
+        skip_bilibili_subtitle: bool,
     ) -> Result<i64, String> {
         let db = Database::open().map_err(|e| e.to_string())?;
         let task_id = task::insert_task(db.conn(), "transcribe", &url, "", "")
@@ -272,12 +274,19 @@ impl TaskManager {
             let wp = whisper_prompt.as_deref();
             let lang = language.as_deref();
             match crate::transcribe::pipeline::transcribe_video(
-                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config, wp, lang, Some(progress_cb),
+                &url, &bvid, video_info.cid, &config.bilibili.cookie, &config, wp, lang, Some(progress_cb), Some(video_info.duration), skip_bilibili_subtitle,
             ).await {
                 Ok(result) => {
                     // 计算转录耗时
                     let elapsed = transcribe_start.elapsed();
                     let duration_label = Self::format_elapsed(elapsed);
+
+                    // 转录来源显示名称
+                    let source_label = match result.source.as_str() {
+                        "cc" => "CC字幕".to_string(),
+                        "ai" => "AI字幕".to_string(),
+                        _ => format!("Whisper ({})", config.whisper.model),
+                    };
 
                     // 存储到数据库
                     let db = Database::open().ok();
@@ -291,7 +300,7 @@ impl TaskManager {
                             author: video_info.author.clone(),
                             duration: video_duration,
                             upload_date: video_info.upload_date.clone(),
-                            transcript_source: result.source.clone(),
+                            transcript_source: source_label.clone(),
                             transcript_text: result.text.clone(),
                             summary: None,
                             status: "transcribed".to_string(),
@@ -306,14 +315,6 @@ impl TaskManager {
                         );
                         let _ = crate::storage::file::render_txt(&record, &output_dir);
                     }
-
-                    let source_label = match result.source.as_str() {
-                        "cc" => "CC字幕",
-                        "ai" => "AI字幕",
-                        _ => "Whisper",
-                    };
-                    let file_info = format!("{} · 耗时{}", source_label, duration_label);
-                    let _ = Self::mark_completed(&app_clone, task_id, "transcribe", &video_info.title, None, Some(&file_info));
 
                     // 如果启用了 AI 摘要，自动触发
                     if config.ai_summary.enabled {
@@ -348,6 +349,10 @@ impl TaskManager {
                             }
                         }
                     }
+
+                    // 所有步骤完成后才标记任务完成
+                    let file_info = format!("{} · 耗时{}", source_label, duration_label);
+                    let _ = Self::mark_completed(&app_clone, task_id, "transcribe", &video_info.title, None, Some(&file_info));
                 }
                 Err(e) => {
                     let _ = Self::mark_failed(&app_clone, task_id, "transcribe", &e.to_string());

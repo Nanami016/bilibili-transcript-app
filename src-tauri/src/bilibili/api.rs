@@ -201,7 +201,7 @@ fn write_cookie_file(cookie: &str) -> Result<std::path::PathBuf> {
 }
 
 /// 获取视频可用格式列表（通过 yt-dlp）
-pub async fn get_video_formats(url: &str, cookie: &str) -> Result<Vec<VideoFormat>> {
+pub async fn get_video_formats(url: &str, _cookie: &str) -> Result<Vec<VideoFormat>> {
     log::info!("获取视频格式列表: url={}", url);
     use std::process::Command;
 
@@ -215,28 +215,15 @@ pub async fn get_video_formats(url: &str, cookie: &str) -> Result<Vec<VideoForma
         "https://www.bilibili.com".to_string(),
     ];
 
-    // 通过 Cookie 文件传递
-    let cookie_file = if !cookie.is_empty() {
-        let path = write_cookie_file(cookie)?;
-        args.push("--cookies".to_string());
-        args.push(path.to_string_lossy().to_string());
-        log::debug!("使用 Cookie 文件: {:?}", path);
-        Some(path)
-    } else {
-        log::warn!("未配置 Cookie，格式列表可能不完整");
-        None
-    };
+    // 优先使用浏览器 Cookie
+    args.push("--cookies-from-browser".to_string());
+    args.push("chrome".to_string());
 
     args.push(url.to_string());
 
     let output = Command::new("yt-dlp")
         .args(&args)
         .output()?;
-
-    // 清理 Cookie 文件
-    if let Some(path) = &cookie_file {
-        let _ = std::fs::remove_file(path);
-    }
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

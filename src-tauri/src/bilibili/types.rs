@@ -39,6 +39,8 @@ pub struct Subtitle {
     pub language: String,
     pub content: String,
     pub source: String, // "cc" | "ai"
+    /// 字幕末尾时间戳（秒），用于校验字幕是否属于目标视频
+    pub duration_secs: Option<f64>,
 }
 
 /// 字幕 URL 信息（从 B站 API 获取）

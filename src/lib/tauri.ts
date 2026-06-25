@@ -89,7 +89,8 @@ export const startTranscribe = (
   language?: string,
   whisperPrompt?: string,
   aiPrompt?: string,
-  aiContext?: string
+  aiContext?: string,
+  skipBilibiliSubtitle?: boolean
 ) =>
   invoke<number>("start_transcribe", {
     url,
@@ -97,6 +98,7 @@ export const startTranscribe = (
     whisperPrompt: whisperPrompt || null,
     aiPrompt: aiPrompt || null,
     aiContext: aiContext || null,
+    skipBilibiliSubtitle: skipBilibiliSubtitle || false,
   });
 export const startAiSummary = (bvid: string) =>
   invoke<number>("start_ai_summary", { bvid });

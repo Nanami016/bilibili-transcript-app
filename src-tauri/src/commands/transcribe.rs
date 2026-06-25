@@ -32,6 +32,8 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
         None,
         None,
         None,
+        Some(video_info.duration),
+        false,
     )
     .await
     .map_err(|e| format!("转录失败: {}", e))?;
@@ -41,6 +43,12 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
 
     let duration_str = format_duration(video_info.duration);
 
+    let source_label = match result.source.as_str() {
+        "cc" => "CC字幕".to_string(),
+        "ai" => "AI字幕".to_string(),
+        _ => format!("Whisper ({})", config.whisper.model),
+    };
+
     let record = TranscriptRecord {
         id: 0,
         bvid: bvid.clone(),
@@ -49,7 +57,7 @@ pub async fn transcribe(url: String) -> Result<TranscriptResult, String> {
         author: video_info.author.clone(),
         duration: duration_str,
         upload_date: video_info.upload_date.clone(),
-        transcript_source: result.source.clone(),
+        transcript_source: source_label,
         transcript_text: result.text.clone(),
         summary: None,
         status: "transcribed".to_string(),

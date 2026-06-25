@@ -55,7 +55,7 @@ fn clean_format_suffix(path: &std::path::Path) -> std::path::PathBuf {
 pub async fn extract_audio(
     url: &str,
     output_dir: &PathBuf,
-    cookie: &str,
+    _cookie: &str,
     on_progress: Option<ProgressCallback>,
 ) -> Result<PathBuf> {
     log::info!("开始提取音频: {}", url);
@@ -80,15 +80,10 @@ pub async fn extract_audio(
         "https://www.bilibili.com".to_string(),
     ];
 
-    let cookie_file = if !cookie.is_empty() {
-        let path = write_cookie_file(cookie)?;
-        args.push("--cookies".to_string());
-        args.push(path.to_string_lossy().to_string());
-        log::debug!("使用 Cookie 文件: {:?}", path);
-        Some(path)
-    } else {
-        None
-    };
+    // 优先使用浏览器 Cookie（更完整），避免 B站 412 反爬
+    args.push("--cookies-from-browser".to_string());
+    args.push("chrome".to_string());
+    log::debug!("使用浏览器 Cookie: chrome");
 
     args.push(url.to_string());
 
@@ -97,7 +92,7 @@ pub async fn extract_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::piped())
         .spawn()?;
 
     // 异步读取 stdout，解析进度
@@ -163,10 +158,6 @@ pub async fn extract_audio(
 
     let status = child.wait().await?;
 
-    if let Some(path) = &cookie_file {
-        let _ = std::fs::remove_file(path);
-    }
-
     if !status.success() {
         let err_msg = stdout_lines.join("\n");
         log::error!("yt-dlp 音频下载失败: {}", err_msg);
@@ -229,7 +220,7 @@ pub async fn extract_audio(
 pub async fn download_audio(
     url: &str,
     output_dir: &PathBuf,
-    cookie: &str,
+    _cookie: &str,
     on_progress: Option<ProgressCallback>,
 ) -> Result<PathBuf> {
     log::info!("下载音频: {}", url);
@@ -252,14 +243,9 @@ pub async fn download_audio(
         "https://www.bilibili.com".to_string(),
     ];
 
-    let cookie_file = if !cookie.is_empty() {
-        let path = write_cookie_file(cookie)?;
-        args.push("--cookies".to_string());
-        args.push(path.to_string_lossy().to_string());
-        Some(path)
-    } else {
-        None
-    };
+    // 优先使用浏览器 Cookie（更完整），避免 B站 412 反爬
+    args.push("--cookies-from-browser".to_string());
+    args.push("chrome".to_string());
 
     args.push(url.to_string());
 
@@ -268,7 +254,7 @@ pub async fn download_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::piped())
         .spawn()?;
 
     let stdout_pipe = child.stdout.take().expect("stdout should be piped");
@@ -313,10 +299,6 @@ pub async fn download_audio(
     }
 
     let status = child.wait().await?;
-
-    if let Some(path) = &cookie_file {
-        let _ = std::fs::remove_file(path);
-    }
 
     log::debug!("yt-dlp exit status: {}", status);
     log::debug!("yt-dlp stdout lines count: {}", stdout_lines.len());

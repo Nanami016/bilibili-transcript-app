@@ -12,6 +12,7 @@ export interface TranscribeParams {
   whisperPrompt: string;
   aiPrompt: string;
   aiContext: string;
+  skipBilibiliSubtitle: boolean;
 }
 
 const LANGUAGES = [
@@ -30,6 +31,7 @@ function TranscribeModal({ visible, videoTitle, onConfirm, onCancel }: Transcrib
   const [whisperPrompt, setWhisperPrompt] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiContext, setAiContext] = useState("");
+  const [skipBilibiliSubtitle, setSkipBilibiliSubtitle] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showContent, setShowContent] = useState(false);
 
@@ -46,7 +48,7 @@ function TranscribeModal({ visible, videoTitle, onConfirm, onCancel }: Transcrib
   if (!visible) return null;
 
   const handleConfirm = () => {
-    onConfirm({ language, whisperPrompt, aiPrompt, aiContext });
+    onConfirm({ language, whisperPrompt, aiPrompt, aiContext, skipBilibiliSubtitle });
   };
 
   return (
@@ -78,6 +80,19 @@ function TranscribeModal({ visible, videoTitle, onConfirm, onCancel }: Transcrib
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={skipBilibiliSubtitle}
+                    onChange={(e) => setSkipBilibiliSubtitle(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  跳过 B站字幕，直接使用本地模型转录
+                </label>
+                <p className="form-hint" style={{ marginLeft: 24 }}>忽略 B站 AI/CC 字幕，强制使用 Whisper 转录</p>
               </div>
 
               <div className="form-group">

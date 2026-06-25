@@ -120,7 +120,7 @@ function Home() {
     setActionLoading("transcribe");
     try {
       const url = `https://www.bilibili.com/video/${videoInfo.bvid}`;
-      await startTranscribe(url, params.language, params.whisperPrompt, params.aiPrompt, params.aiContext);
+      await startTranscribe(url, params.language, params.whisperPrompt, params.aiPrompt, params.aiContext, params.skipBilibiliSubtitle);
       setToast({ message: "转录任务已启动", type: "info" });
     } catch (err) {
       setToast({ message: `启动失败: ${err}`, type: "error" });

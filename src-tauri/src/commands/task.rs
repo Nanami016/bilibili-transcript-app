@@ -46,6 +46,7 @@ pub async fn start_audio_download(
 
 /// 启动转录任务
 #[command]
+#[allow(clippy::too_many_arguments)]
 pub async fn start_transcribe(
     app: AppHandle,
     manager: State<'_, TaskManager>,
@@ -54,8 +55,9 @@ pub async fn start_transcribe(
     whisper_prompt: Option<String>,
     ai_prompt: Option<String>,
     ai_context: Option<String>,
+    skip_bilibili_subtitle: Option<bool>,
 ) -> Result<i64, String> {
-    manager.start_transcribe(app, url, language, whisper_prompt, ai_prompt, ai_context).await
+    manager.start_transcribe(app, url, language, whisper_prompt, ai_prompt, ai_context, skip_bilibili_subtitle.unwrap_or(false)).await
 }
 
 /// 启动 AI 摘要任务

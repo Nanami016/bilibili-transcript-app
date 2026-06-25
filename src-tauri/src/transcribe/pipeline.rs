@@ -32,18 +32,53 @@ pub async fn transcribe_video(
     whisper_prompt_override: Option<&str>,
     language: Option<&str>,
     on_progress: Option<ProgressCallback>,
+    video_duration_secs: Option<i64>,
+    skip_bilibili_subtitle: bool,
 ) -> Result<TranscriptResult> {
-    log::info!("开始转录: bvid={}, cid={}", bvid, cid);
+    log::info!("开始转录: bvid={}, cid={}, skip_subtitle={}", bvid, cid, skip_bilibili_subtitle);
 
-    // Step 1: 尝试获取字幕（CC → AI）
+    // Step 1: 尝试获取字幕（CC → AI），如果用户选择跳过则直接进入 Whisper
+    if skip_bilibili_subtitle {
+        log::info!("用户选择跳过 B站字幕，直接使用 Whisper 转录");
+    } else {
     match crate::bilibili::subtitle::try_get_subtitle(bvid, cid, cookie).await {
         Ok(Some(subtitle)) => {
-            log::info!("获取到字幕: source={}", subtitle.source);
-            return Ok(TranscriptResult {
-                text: subtitle.content,
-                source: subtitle.source,
-                language: Some(subtitle.language),
-            });
+            // 校验字幕时长与视频时长是否匹配
+            if let Some(sub_dur) = subtitle.duration_secs {
+                let video_dur = video_duration_secs.unwrap_or(0) as f64;
+                // 仅在已知视频时长时做校验
+                if video_dur > 0.0 {
+                    let ratio = sub_dur / video_dur;
+                    if !(0.5..=2.0).contains(&ratio) {
+                        log::warn!(
+                            "字幕时长({:.1}s)与视频时长({:.1}s)差异过大(ratio={:.2})，可能不是同一视频，降级到 Whisper",
+                            sub_dur, video_dur, ratio
+                        );
+                        // 不返回字幕结果，继续走 Whisper 流程
+                    } else {
+                        log::info!("获取到字幕: source={}, 时长校验通过({:.1}s vs {:.1}s)", subtitle.source, sub_dur, video_dur);
+                        return Ok(TranscriptResult {
+                            text: subtitle.content,
+                            source: subtitle.source,
+                            language: Some(subtitle.language),
+                        });
+                    }
+                } else {
+                    log::info!("获取到字幕: source={} (未知视频时长，跳过时长校验)", subtitle.source);
+                    return Ok(TranscriptResult {
+                        text: subtitle.content,
+                        source: subtitle.source,
+                        language: Some(subtitle.language),
+                    });
+                }
+            } else {
+                log::info!("获取到字幕: source={} (字幕无时间戳，跳过时长校验)", subtitle.source);
+                return Ok(TranscriptResult {
+                    text: subtitle.content,
+                    source: subtitle.source,
+                    language: Some(subtitle.language),
+                });
+            }
         }
         Ok(None) => {
             log::info!("未找到字幕，将使用 Whisper 转录");
@@ -52,6 +87,7 @@ pub async fn transcribe_video(
             log::warn!("获取字幕失败: {}，将使用 Whisper 转录", e);
         }
     }
+    } // end of skip_bilibili_subtitle else block
 
     // Step 2: 使用 Whisper 转录
     // 检查 Whisper 配置
