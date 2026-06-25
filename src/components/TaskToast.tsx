@@ -27,6 +27,8 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 function TaskToast() {
   const [toasts, setToasts] = useState<Map<number, ActiveToast>>(new Map());
   const dismissTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // 记录用户手动关闭的 task ID，不再重新弹出
+  const manuallyDismissed = useRef<Set<number>>(new Set());
 
   // 清理定时器
   useEffect(() => {
@@ -52,6 +54,9 @@ function TaskToast() {
     const unlistenFns: (() => void)[] = [];
 
     onTaskProgress((event: TaskProgressEvent) => {
+      // 用户手动关闭的 toast 不再重新弹出
+      if (manuallyDismissed.current.has(event.task_id)) return;
+
       // 取消之前的消失定时器（如果任务重新活跃）
       const existing = dismissTimers.current.get(event.task_id);
       if (existing) {
@@ -77,6 +82,12 @@ function TaskToast() {
     }).then((fn) => unlistenFns.push(fn));
 
     onTaskCompleted((event: TaskCompletedEvent) => {
+      // 用户手动关闭的 toast 完成时也不重新弹出，只清理标记
+      if (manuallyDismissed.current.has(event.task_id)) {
+        manuallyDismissed.current.delete(event.task_id);
+        return;
+      }
+
       const label = TASK_TYPE_LABELS[event.task_type] || event.task_type;
       setToasts((prev) => {
         const next = new Map(prev);
@@ -119,6 +130,8 @@ function TaskToast() {
             <button
               className="task-toast-close"
               onClick={() => {
+                // 标记为手动关闭，防止进度更新时重新弹出
+                manuallyDismissed.current.add(toast.task_id);
                 const timer = dismissTimers.current.get(toast.task_id);
                 if (timer) clearTimeout(timer);
                 dismissTimers.current.delete(toast.task_id);

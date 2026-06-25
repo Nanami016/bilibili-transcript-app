@@ -90,6 +90,7 @@ impl Database {
                 transcript_text = excluded.transcript_text,
                 summary = COALESCE(excluded.summary, transcripts.summary),
                 status = excluded.status,
+                created_at = datetime('now', 'localtime'),
                 updated_at = datetime('now', 'localtime')",
             rusqlite::params![
                 record.bvid,

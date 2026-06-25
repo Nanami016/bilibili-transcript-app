@@ -34,7 +34,7 @@ pub async fn download_video(
     url: &str,
     format_id: &str,
     output_dir: &PathBuf,
-    cookie: &str,
+    _cookie: &str,
     on_progress: Option<ProgressCallback>,
 ) -> Result<PathBuf> {
     log::info!("开始下载视频: url={}, format={}", url, format_id);
@@ -62,17 +62,10 @@ pub async fn download_video(
         args.push(format_id.to_string());
     }
 
-    // Cookie 文件
-    let cookie_file = if !cookie.is_empty() {
-        let path = write_cookie_file(cookie)?;
-        args.push("--cookies".to_string());
-        args.push(path.to_string_lossy().to_string());
-        log::debug!("使用 Cookie 文件: {:?}", path);
-        Some(path)
-    } else {
-        log::warn!("未配置 Cookie，下载可能会失败");
-        None
-    };
+    // 优先使用浏览器 Cookie（更完整），避免 B站 412 反爬
+    args.push("--cookies-from-browser".to_string());
+    args.push("chrome".to_string());
+    log::debug!("使用浏览器 Cookie: chrome");
 
     args.push(url.to_string());
 
@@ -81,7 +74,7 @@ pub async fn download_video(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit())  // stderr 继承进程，调试日志直接输出
+        .stderr(std::process::Stdio::piped())
         .spawn()?;
 
     // 异步读取 stdout，解析进度（yt-dlp --newline 把进度输出到 stdout）
@@ -121,11 +114,6 @@ pub async fn download_video(
 
     let status = child.wait().await?;
 
-    // 清理 Cookie 文件
-    if let Some(path) = &cookie_file {
-        let _ = std::fs::remove_file(path);
-    }
-
     if !status.success() {
         let err_msg = stdout_lines.join("\n");
         log::error!("yt-dlp 下载失败: {}", err_msg);
@@ -153,7 +141,7 @@ pub async fn download_video(
 }
 
 /// 获取视频可用格式列表
-pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Value>> {
+pub async fn list_formats(url: &str, _cookie: &str) -> Result<Vec<serde_json::Value>> {
     log::info!("获取视频格式列表: {}", url);
 
     let mut args = vec![
@@ -165,14 +153,9 @@ pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Val
         "https://www.bilibili.com".to_string(),
     ];
 
-    let cookie_file = if !cookie.is_empty() {
-        let path = write_cookie_file(cookie)?;
-        args.push("--cookies".to_string());
-        args.push(path.to_string_lossy().to_string());
-        Some(path)
-    } else {
-        None
-    };
+    // 优先使用浏览器 Cookie
+    args.push("--cookies-from-browser".to_string());
+    args.push("chrome".to_string());
 
     args.push(url.to_string());
 
@@ -180,10 +163,6 @@ pub async fn list_formats(url: &str, cookie: &str) -> Result<Vec<serde_json::Val
         .args(&args)
         .output()
         .await?;
-
-    if let Some(path) = &cookie_file {
-        let _ = std::fs::remove_file(path);
-    }
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
