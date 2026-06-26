@@ -76,6 +76,7 @@ pub async fn extract_audio(
         mp3_str.to_string(),
         "--no-playlist".to_string(),
         "--newline".to_string(),  // 强制每行刷新
+        "--restrict-filenames".to_string(),  // 将特殊字符替换为下划线，避免 [ ] 等字符导致文件操作失败
         "--user-agent".to_string(),
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36".to_string(),
         "--referer".to_string(),
