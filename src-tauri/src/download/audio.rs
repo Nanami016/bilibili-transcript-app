@@ -87,6 +87,15 @@ pub async fn extract_audio(
     args.push("chrome".to_string());
     log::debug!("使用浏览器 Cookie: chrome");
 
+    // 指定 ffmpeg 路径，解决 App bundle 启动时 PATH 不完整的问题
+    if let Ok(ffmpeg_path) = utils::resolve_ffmpeg_path() {
+        if let Some(parent) = ffmpeg_path.parent() {
+            args.push("--ffmpeg-location".to_string());
+            args.push(parent.to_string_lossy().to_string());
+            log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+        }
+    }
+
     args.push(url.to_string());
 
     log::debug!("执行 yt-dlp {:?}", args);
@@ -212,7 +221,9 @@ pub async fn extract_audio(
     } else {
         // Step 2: 使用 ffmpeg 转为 16kHz 单声道 WAV
         log::debug!("Step 2: ffmpeg 转换为 16kHz WAV");
-        let ffmpeg_output = Command::new("ffmpeg")
+        let ffmpeg_path = utils::resolve_ffmpeg_path()?;
+        log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+        let ffmpeg_output = Command::new(&ffmpeg_path)
             .args([
                 "-y",
                 "-i",
@@ -271,6 +282,15 @@ pub async fn download_audio(
     // 优先使用浏览器 Cookie（更完整），避免 B站 412 反爬
     args.push("--cookies-from-browser".to_string());
     args.push("chrome".to_string());
+
+    // 指定 ffmpeg 路径，解决 App bundle 启动时 PATH 不完整的问题
+    if let Ok(ffmpeg_path) = utils::resolve_ffmpeg_path() {
+        if let Some(parent) = ffmpeg_path.parent() {
+            args.push("--ffmpeg-location".to_string());
+            args.push(parent.to_string_lossy().to_string());
+            log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+        }
+    }
 
     args.push(url.to_string());
 
