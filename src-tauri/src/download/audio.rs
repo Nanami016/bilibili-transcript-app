@@ -88,11 +88,16 @@ pub async fn extract_audio(
     log::debug!("使用浏览器 Cookie: chrome");
 
     // 指定 ffmpeg 路径，解决 App bundle 启动时 PATH 不完整的问题
-    if let Ok(ffmpeg_path) = utils::resolve_ffmpeg_path() {
-        if let Some(parent) = ffmpeg_path.parent() {
-            args.push("--ffmpeg-location".to_string());
-            args.push(parent.to_string_lossy().to_string());
-            log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+    match utils::resolve_ffmpeg_path() {
+        Ok(ffmpeg_path) => {
+            if let Some(parent) = ffmpeg_path.parent() {
+                args.push("--ffmpeg-location".to_string());
+                args.push(parent.to_string_lossy().to_string());
+                log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+            }
+        }
+        Err(e) => {
+            log::warn!("未找到 ffmpeg，yt-dlp 后处理可能失败: {}", e);
         }
     }
 
@@ -284,11 +289,16 @@ pub async fn download_audio(
     args.push("chrome".to_string());
 
     // 指定 ffmpeg 路径，解决 App bundle 启动时 PATH 不完整的问题
-    if let Ok(ffmpeg_path) = utils::resolve_ffmpeg_path() {
-        if let Some(parent) = ffmpeg_path.parent() {
-            args.push("--ffmpeg-location".to_string());
-            args.push(parent.to_string_lossy().to_string());
-            log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+    match utils::resolve_ffmpeg_path() {
+        Ok(ffmpeg_path) => {
+            if let Some(parent) = ffmpeg_path.parent() {
+                args.push("--ffmpeg-location".to_string());
+                args.push(parent.to_string_lossy().to_string());
+                log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+            }
+        }
+        Err(e) => {
+            log::warn!("未找到 ffmpeg，yt-dlp 后处理可能失败: {}", e);
         }
     }
 

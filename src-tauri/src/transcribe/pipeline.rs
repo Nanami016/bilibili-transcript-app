@@ -49,14 +49,16 @@ pub async fn transcribe_video(
                 // 仅在已知视频时长时做校验
                 if video_dur > 0.0 {
                     let ratio = sub_dur / video_dur;
-                    if !(0.5..=2.0).contains(&ratio) {
+                    // 收紧校验范围：字幕时长应在视频时长的 0.8~1.5 倍之间
+                    // 超出范围说明字幕可能不是同一视频的，降级到 Whisper
+                    if !(0.8..=1.5).contains(&ratio) {
                         log::warn!(
                             "字幕时长({:.1}s)与视频时长({:.1}s)差异过大(ratio={:.2})，可能不是同一视频，降级到 Whisper",
                             sub_dur, video_dur, ratio
                         );
                         // 不返回字幕结果，继续走 Whisper 流程
                     } else {
-                        log::info!("获取到字幕: source={}, 时长校验通过({:.1}s vs {:.1}s)", subtitle.source, sub_dur, video_dur);
+                        log::info!("获取到字幕: source={}, 时长校验通过({:.1}s vs {:.1}s, ratio={:.2})", subtitle.source, sub_dur, video_dur, ratio);
                         return Ok(TranscriptResult {
                             text: subtitle.content,
                             source: subtitle.source,
