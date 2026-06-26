@@ -512,6 +512,8 @@ impl TaskManager {
         task_type: &str,
         error: &str,
     ) -> Result<(), String> {
+        log::error!("任务失败: task_id={}, type={}, error={}", task_id, task_type, error);
+
         let db = Database::open().map_err(|e| e.to_string())?;
         task::update_task_status(db.conn(), task_id, "failed", None, Some(error), None)
             .map_err(|e| e.to_string())?;
