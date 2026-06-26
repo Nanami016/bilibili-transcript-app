@@ -69,6 +69,15 @@ pub async fn download_video(
     args.push("chrome".to_string());
     log::debug!("使用浏览器 Cookie: chrome");
 
+    // 指定 ffmpeg 路径，解决 App bundle 启动时 PATH 不完整的问题
+    if let Ok(ffmpeg_path) = utils::resolve_ffmpeg_path() {
+        if let Some(parent) = ffmpeg_path.parent() {
+            args.push("--ffmpeg-location".to_string());
+            args.push(parent.to_string_lossy().to_string());
+            log::debug!("ffmpeg 路径: {:?}", ffmpeg_path);
+        }
+    }
+
     args.push(url.to_string());
 
     log::debug!("执行 yt-dlp {:?}", args);

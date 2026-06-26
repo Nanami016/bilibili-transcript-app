@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.1 (2026-06-26)
+
+### Bug Fixes
+- **App bundle 找不到 ffmpeg**: yt-dlp 后处理（m4a→mp3 转换）时找不到 ffmpeg，报错 `ffprobe and ffmpeg not found`。新增 `resolve_ffmpeg_path()` + `--ffmpeg-location` 参数
+
 ## v1.2.0 (2026-06-26)
 
 ### Bug Fixes
