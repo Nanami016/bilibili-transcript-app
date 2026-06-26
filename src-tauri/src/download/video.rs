@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use tokio::io::AsyncBufReadExt;
 use tokio::process::Command;
 
+use crate::utils;
+
 /// 进度回调: (progress: 0.0~100.0, speed: String, eta: String)
 pub type ProgressCallback = Box<dyn Fn(f64, String, String) + Send + 'static>;
 
@@ -71,7 +73,9 @@ pub async fn download_video(
 
     log::debug!("执行 yt-dlp {:?}", args);
 
-    let mut child = Command::new("yt-dlp")
+    let ytdlp_path = utils::resolve_ytdlp_path()?;
+    log::debug!("yt-dlp 路径: {:?}", ytdlp_path);
+    let mut child = Command::new(&ytdlp_path)
         .args(&args)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -180,7 +184,9 @@ pub async fn list_formats(url: &str, _cookie: &str) -> Result<Vec<serde_json::Va
 
     args.push(url.to_string());
 
-    let output = tokio::process::Command::new("yt-dlp")
+    let ytdlp_path = utils::resolve_ytdlp_path()?;
+    log::debug!("yt-dlp 路径: {:?}", ytdlp_path);
+    let output = tokio::process::Command::new(&ytdlp_path)
         .args(&args)
         .output()
         .await?;

@@ -6,6 +6,7 @@ use regex::Regex;
 use reqwest::Client;
 
 use super::types::*;
+use crate::utils;
 
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -221,7 +222,9 @@ pub async fn get_video_formats(url: &str, _cookie: &str) -> Result<Vec<VideoForm
 
     args.push(url.to_string());
 
-    let output = Command::new("yt-dlp")
+    let ytdlp_path = utils::resolve_ytdlp_path()?;
+    log::debug!("yt-dlp 路径: {:?}", ytdlp_path);
+    let output = Command::new(&ytdlp_path)
         .args(&args)
         .output()?;
 

@@ -12,6 +12,7 @@ mod storage;
 mod summary;
 mod task;
 mod transcribe;
+mod utils;
 
 use config::AppConfig;
 
