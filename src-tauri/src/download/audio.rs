@@ -92,8 +92,20 @@ pub async fn extract_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit())  // 继承 stderr，避免 pipe 缓冲区满导致死锁
+        .stderr(std::process::Stdio::piped())
         .spawn()?;
+
+    // 异步读取 stderr，避免 pipe 缓冲区满导致死锁
+    let stderr_pipe = child.stderr.take().expect("stderr should be piped");
+    let stderr_handle = tokio::spawn(async move {
+        let reader = tokio::io::BufReader::new(stderr_pipe);
+        let mut lines = reader.lines();
+        let mut stderr_lines = Vec::new();
+        while let Ok(Some(line)) = lines.next_line().await {
+            stderr_lines.push(line);
+        }
+        stderr_lines
+    });
 
     // 异步读取 stdout，解析进度
     let stdout_pipe = child.stdout.take().expect("stdout should be piped");
@@ -157,11 +169,20 @@ pub async fn extract_audio(
     }
 
     let status = child.wait().await?;
+    let stderr_lines = stderr_handle.await.unwrap_or_default();
 
     if !status.success() {
         let err_msg = stdout_lines.join("\n");
-        log::error!("yt-dlp 音频下载失败: {}", err_msg);
-        bail!("yt-dlp 音频下载失败: {}", err_msg);
+        let stderr_msg = stderr_lines.join("\n");
+        log::error!("yt-dlp 音频下载失败: stdout={}, stderr={}", err_msg, stderr_msg);
+        bail!("yt-dlp 音频下载失败: {}", if err_msg.is_empty() { stderr_msg } else { err_msg });
+    }
+
+    // 记录 stderr 中的警告信息
+    for line in &stderr_lines {
+        if !line.trim().is_empty() {
+            log::warn!("yt-dlp stderr: {}", line);
+        }
     }
 
     let stdout = stdout_lines.join("\n");
@@ -254,8 +275,20 @@ pub async fn download_audio(
     let mut child = Command::new("yt-dlp")
         .args(&args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::inherit())  // 继承 stderr，避免 pipe 缓冲区满导致死锁
+        .stderr(std::process::Stdio::piped())
         .spawn()?;
+
+    // 异步读取 stderr，避免 pipe 缓冲区满导致死锁
+    let stderr_pipe = child.stderr.take().expect("stderr should be piped");
+    let stderr_handle = tokio::spawn(async move {
+        let reader = tokio::io::BufReader::new(stderr_pipe);
+        let mut lines = reader.lines();
+        let mut stderr_lines = Vec::new();
+        while let Ok(Some(line)) = lines.next_line().await {
+            stderr_lines.push(line);
+        }
+        stderr_lines
+    });
 
     let stdout_pipe = child.stdout.take().expect("stdout should be piped");
     let reader = tokio::io::BufReader::new(stdout_pipe);
@@ -299,18 +332,31 @@ pub async fn download_audio(
     }
 
     let status = child.wait().await?;
+    let stderr_lines = stderr_handle.await.unwrap_or_default();
 
     log::debug!("yt-dlp exit status: {}", status);
     log::debug!("yt-dlp stdout lines count: {}", stdout_lines.len());
     for (i, line) in stdout_lines.iter().enumerate() {
         log::debug!("yt-dlp stdout[{}]: {}", i, line);
     }
+    log::debug!("yt-dlp stderr lines count: {}", stderr_lines.len());
+    for (i, line) in stderr_lines.iter().enumerate() {
+        log::debug!("yt-dlp stderr[{}]: {}", i, line);
+    }
     log::debug!("yt-dlp final_path: {:?}", final_path);
 
     if !status.success() {
         let err_msg = stdout_lines.join("\n");
-        log::error!("yt-dlp 音频下载失败: {}", err_msg);
-        bail!("yt-dlp 音频下载失败: {}", err_msg);
+        let stderr_msg = stderr_lines.join("\n");
+        log::error!("yt-dlp 音频下载失败: stdout={}, stderr={}", err_msg, stderr_msg);
+        bail!("yt-dlp 音频下载失败: {}", if err_msg.is_empty() { stderr_msg } else { err_msg });
+    }
+
+    // 记录 stderr 中的警告信息
+    for line in &stderr_lines {
+        if !line.trim().is_empty() {
+            log::warn!("yt-dlp stderr: {}", line);
+        }
     }
 
     let filepath = final_path

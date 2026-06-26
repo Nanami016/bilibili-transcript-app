@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.3 (2026-06-26)
+
+### Bug Fixes
+- **下载失败无日志记录**: `mark_failed` 未调用 `log::error!`，导致任务失败信息不写入日志文件
+- **yt-dlp stderr 未捕获**: yt-dlp 错误输出直接打到终端而非日志，现改为异步读取 stderr 并记录到日志
+
 ## v1.1.2 (2026-06-25)
 
 ### Bug Fixes
