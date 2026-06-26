@@ -4,6 +4,8 @@
 use std::process::Command;
 use tauri::command;
 
+use crate::utils;
+
 /// 导入 Cookie
 #[command]
 pub async fn import_cookie(cookie: String) -> Result<(), String> {
@@ -31,7 +33,10 @@ pub async fn import_cookie_from_browser(browser: String) -> Result<String, Strin
     let _ = std::fs::remove_file(&cookie_path);
 
     // 查找 yt-dlp 路径
-    let yt_dlp_path = find_yt_dlp()?;
+    let yt_dlp_path = utils::resolve_ytdlp_path()
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .to_string();
     log::debug!("执行 yt-dlp: {:?}", yt_dlp_path);
 
     let output = Command::new(&yt_dlp_path)
@@ -77,37 +82,6 @@ pub async fn import_cookie_from_browser(browser: String) -> Result<String, Strin
 
     log::info!("从浏览器读取 Cookie 成功: uid={}", dede_uid);
     Ok(format!("成功从 {} 读取 Cookie (用户: {})", browser, dede_uid))
-}
-
-/// 查找 yt-dlp 可执行文件路径
-fn find_yt_dlp() -> Result<String, String> {
-    // 常见的 yt-dlp 安装路径
-    let candidates = [
-        "/opt/homebrew/bin/yt-dlp",
-        "/usr/local/bin/yt-dlp",
-        "/usr/bin/yt-dlp",
-    ];
-
-    for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            return Ok(path.to_string());
-        }
-    }
-
-    // 尝试用 which 查找
-    let output = std::process::Command::new("which")
-        .arg("yt-dlp")
-        .output()
-        .map_err(|e| format!("执行 which 失败: {}", e))?;
-
-    if output.status.success() {
-        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !path.is_empty() {
-            return Ok(path);
-        }
-    }
-
-    Err("未找到 yt-dlp，请先安装: brew install yt-dlp".to_string())
 }
 
 /// 解析 Cookie 内容

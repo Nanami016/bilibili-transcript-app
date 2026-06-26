@@ -31,8 +31,14 @@ https://github.com/Nanami016/bilibili-transcript-app/assets/REPLACE_WITH_YOUR_VI
 
 前往 [Releases](https://github.com/Nanami016/bilibili-transcript-app/releases) 页面下载最新 `.dmg` 文件。
 
-1. 双击打开 DMG，将应用拖入 Applications 文件夹
-2. 首次打开如有「已损坏」提示，请在终端执行以下命令后重试：
+1. 安装依赖（终端执行）：
+
+```bash
+brew install yt-dlp ffmpeg
+```
+
+2. 双击打开 DMG，将应用拖入 Applications 文件夹
+3. 首次打开如有「已损坏」提示，请在终端执行以下命令后重试：
 
 ```bash
 sudo xattr -r -d com.apple.quarantine /Applications/Bilibili\ Transcript.app

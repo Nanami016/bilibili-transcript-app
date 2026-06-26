@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.2.0 (2026-06-26)
+
+### Bug Fixes
+- **App bundle 找不到 yt-dlp**: App 从 `/Applications` 启动时 PATH 不包含 `/opt/homebrew/bin/`，导致 `No such file or directory` 错误。新增 `resolve_ytdlp_path()` 自动搜索常见安装路径
+- **下载失败无日志记录**: `mark_failed` 未调用 `log::error!`，导致任务失败信息不写入日志文件
+- **yt-dlp stderr 未捕获**: yt-dlp 错误输出直接打到终端而非日志，现改为异步读取 stderr 并记录到日志
+
+### Docs
+- README 补充 DMG 安装方式的依赖说明（brew install yt-dlp ffmpeg）
+
 ## v1.1.3 (2026-06-26)
 
 ### Bug Fixes
