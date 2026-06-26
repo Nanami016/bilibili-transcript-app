@@ -19,6 +19,7 @@ use config::AppConfig;
 fn main() {
     commands::log::init_logger();
     log::info!("Bilibili Transcript 启动中...");
+    log::info!("版本: {} ({})", env!("CARGO_PKG_VERSION"), if cfg!(debug_assertions) { "debug" } else { "release" });
 
     let app_config = config::storage::load_config().unwrap_or_else(|e| {
         log::warn!("加载配置失败，使用默认配置: {}", e);
